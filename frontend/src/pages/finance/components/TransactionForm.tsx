@@ -1,0 +1,171 @@
+import { createSignal, onMount } from 'solid-js';
+import { transactionService } from '../../../services/finance/transactionService';
+import type { Transaction, TransactionCreate, TransactionUpdate } from '../../../services/finance/transactionService';
+import type { Category } from '../../../services/finance/categoryService';
+import { format } from 'date-fns';
+
+interface TransactionFormProps {
+  transaction?: Transaction | null;
+  categories: Category[];
+  onClose: () => void;
+  onSubmit: () => void;
+}
+
+const TransactionForm = (props: TransactionFormProps) => {
+  const [date, setDate] = createSignal(
+    props.transaction?.date ? format(new Date(props.transaction.date), 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd')
+  );
+  const [amount, setAmount] = createSignal(props.transaction?.amount.toString() || '');
+  const [description, setDescription] = createSignal(props.transaction?.description || '');
+  const [categoryId, setCategoryId] = createSignal(props.transaction?.category_id || '');
+  const [paymentMethod, setPaymentMethod] = createSignal(props.transaction?.payment_method || '');
+  const [notes, setNotes] = createSignal(props.transaction?.notes || '');
+  const [tags, setTags] = createSignal(props.transaction?.tags?.join(', ') || '');
+  const [loading, setLoading] = createSignal(false);
+  const [error, setError] = createSignal('');
+
+  const handleSubmit = async (e: Event) => {
+    e.preventDefault();
+    setError('');
+    setLoading(true);
+
+    try {
+      const tagsArray = tags().split(',').map(t => t.trim()).filter(t => t);
+      
+      if (props.transaction) {
+        const updateData: TransactionUpdate = {
+          date: date(),
+          amount: parseFloat(amount()),
+          description: description() || undefined,
+          category_id: categoryId(),
+          payment_method: paymentMethod() || undefined,
+          notes: notes() || undefined,
+          tags: tagsArray.length > 0 ? tagsArray : undefined,
+        };
+        await transactionService.update(props.transaction.id, updateData);
+      } else {
+        const createData: TransactionCreate = {
+          date: date(),
+          amount: parseFloat(amount()),
+          description: description() || undefined,
+          category_id: categoryId(),
+          payment_method: paymentMethod() || undefined,
+          notes: notes() || undefined,
+          tags: tagsArray.length > 0 ? tagsArray : undefined,
+        };
+        await transactionService.create(createData);
+      }
+      props.onSubmit();
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to save transaction');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+      <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white m-4">
+        <h3 class="text-lg font-bold mb-4">
+          {props.transaction ? 'Edit Transaction' : 'Create Transaction'}
+        </h3>
+        <form onSubmit={handleSubmit}>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Date</label>
+              <input
+                type="date"
+                required
+                value={date()}
+                onInput={(e) => setDate(e.currentTarget.value)}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+              <input
+                type="number"
+                step="0.01"
+                required
+                value={amount()}
+                onInput={(e) => setAmount(e.currentTarget.value)}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              />
+            </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+            <select
+              required
+              value={categoryId()}
+              onChange={(e) => setCategoryId(e.currentTarget.value)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="">Select a category</option>
+              {props.categories.map((cat) => (
+                <option value={cat.id}>{cat.name}</option>
+              ))}
+            </select>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <input
+              type="text"
+              value={description()}
+              onInput={(e) => setDescription(e.currentTarget.value)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Payment Method</label>
+            <input
+              type="text"
+              value={paymentMethod()}
+              onInput={(e) => setPaymentMethod(e.currentTarget.value)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Tags (comma-separated)</label>
+            <input
+              type="text"
+              value={tags()}
+              onInput={(e) => setTags(e.currentTarget.value)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              placeholder="tag1, tag2, tag3"
+            />
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+            <textarea
+              value={notes()}
+              onInput={(e) => setNotes(e.currentTarget.value)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              rows="3"
+            />
+          </div>
+          {error() && <div class="text-red-600 text-sm mb-4">{error()}</div>}
+          <div class="flex justify-end space-x-2">
+            <button
+              type="button"
+              onClick={props.onClose}
+              class="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={loading()}
+              class="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 disabled:opacity-50"
+            >
+              {loading() ? 'Saving...' : 'Save'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+export default TransactionForm;
+
