@@ -1,18 +1,18 @@
 import { createSignal, Show } from 'solid-js';
-import { recurringExpenseService } from '../../../services/finance/recurringExpenseService';
-import type { RecurringExpense, RecurringExpenseCreate, RecurringExpenseUpdate } from '../../../services/finance/recurringExpenseService';
+import { expenseService } from '../../../services/finance/expenseService';
+import type { Expense, ExpenseCreate, ExpenseUpdate } from '../../../services/finance/expenseService';
 import type { Category } from '../../../services/finance/categoryService';
 import { format } from 'date-fns';
 
-interface RecurringExpenseFormProps {
-  expense?: RecurringExpense | null;
+interface ExpenseFormProps {
+  expense?: Expense | null;
   categories: Category[];
   onClose: () => void;
   onSubmit: () => void;
   defaultExpenseType?: 'ongoing' | 'installment';
 }
 
-const RecurringExpenseForm = (props: RecurringExpenseFormProps) => {
+const ExpenseForm = (props: ExpenseFormProps) => {
   const [name, setName] = createSignal(props.expense?.name || '');
   const [amount, setAmount] = createSignal(props.expense?.amount?.toString() || '');
   const [categoryId, setCategoryId] = createSignal(props.expense?.category_id || '');
@@ -37,7 +37,7 @@ const RecurringExpenseForm = (props: RecurringExpenseFormProps) => {
 
     try {
       if (props.expense) {
-        const updateData: RecurringExpenseUpdate = {
+        const updateData: ExpenseUpdate = {
           name: name(),
           amount: amount() ? parseFloat(amount()) : undefined,
           category_id: categoryId(),
@@ -47,9 +47,9 @@ const RecurringExpenseForm = (props: RecurringExpenseFormProps) => {
           total_payments: expenseType() === 'installment' && totalPayments() ? parseInt(totalPayments()) : undefined,
           notes: notes() || undefined,
         };
-        await recurringExpenseService.update(props.expense.id, updateData);
+        await expenseService.update(props.expense.id, updateData);
       } else {
-        const createData: RecurringExpenseCreate = {
+        const createData: ExpenseCreate = {
           name: name(),
           amount: amount() ? parseFloat(amount()) : undefined,
           category_id: categoryId(),
@@ -59,11 +59,11 @@ const RecurringExpenseForm = (props: RecurringExpenseFormProps) => {
           total_payments: expenseType() === 'installment' && totalPayments() ? parseInt(totalPayments()) : undefined,
           notes: notes() || undefined,
         };
-        await recurringExpenseService.create(createData);
+        await expenseService.create(createData);
       }
       props.onSubmit();
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to save recurring expense');
+      setError(err.response?.data?.detail || 'Failed to save expense');
     } finally {
       setLoading(false);
     }
@@ -73,7 +73,7 @@ const RecurringExpenseForm = (props: RecurringExpenseFormProps) => {
     <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white m-4">
         <h3 class="text-lg font-bold mb-4">
-          {props.expense ? 'Edit Recurring Expense' : 'Create Recurring Expense'}
+          {props.expense ? 'Edit Expense' : 'Create Expense'}
         </h3>
         <form onSubmit={handleSubmit}>
           <div class="mb-4">
@@ -200,5 +200,5 @@ const RecurringExpenseForm = (props: RecurringExpenseFormProps) => {
   );
 };
 
-export default RecurringExpenseForm;
+export default ExpenseForm;
 

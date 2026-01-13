@@ -1,6 +1,6 @@
 import api from '../../shared/services/api';
 
-export interface RecurringExpense {
+export interface Expense {
   id: string;
   user_id: string;
   name: string;
@@ -17,7 +17,7 @@ export interface RecurringExpense {
   updated_at: string;
 }
 
-export interface RecurringExpenseCreate {
+export interface ExpenseCreate {
   name: string;
   amount?: number;
   category_id: string;
@@ -28,7 +28,7 @@ export interface RecurringExpenseCreate {
   notes?: string;
 }
 
-export interface RecurringExpenseUpdate {
+export interface ExpenseUpdate {
   name?: string;
   amount?: number;
   category_id?: string;
@@ -45,39 +45,39 @@ export interface GenerateTransactionRequest {
   notes?: string;
 }
 
-export const recurringExpenseService = {
-  async getAll(is_active?: boolean): Promise<RecurringExpense[]> {
-    const response = await api.get<RecurringExpense[]>('/recurring-expenses', {
+export const expenseService = {
+  async getAll(is_active?: boolean): Promise<Expense[]> {
+    const response = await api.get<Expense[]>('/expenses', {
       params: is_active !== undefined ? { is_active } : {},
     });
     return response.data;
   },
 
-  async getById(id: string): Promise<RecurringExpense> {
-    const response = await api.get<RecurringExpense>(`/recurring-expenses/${id}`);
+  async getById(id: string): Promise<Expense> {
+    const response = await api.get<Expense>(`/expenses/${id}`);
     return response.data;
   },
 
-  async create(data: RecurringExpenseCreate): Promise<RecurringExpense> {
-    const response = await api.post<RecurringExpense>('/recurring-expenses', data);
+  async create(data: ExpenseCreate): Promise<Expense> {
+    const response = await api.post<Expense>('/expenses', data);
     return response.data;
   },
 
-  async update(id: string, data: RecurringExpenseUpdate): Promise<RecurringExpense> {
-    const response = await api.put<RecurringExpense>(`/recurring-expenses/${id}`, data);
+  async update(id: string, data: ExpenseUpdate): Promise<Expense> {
+    const response = await api.put<Expense>(`/expenses/${id}`, data);
     return response.data;
   },
 
   async delete(id: string): Promise<void> {
-    await api.delete(`/recurring-expenses/${id}`);
+    await api.delete(`/expenses/${id}`);
   },
 
   async generateTransaction(id: string, data: GenerateTransactionRequest) {
-    const response = await api.post(`/recurring-expenses/${id}/generate-transaction`, data);
+    const response = await api.post(`/expenses/${id}/generate-transaction`, data);
     return response.data;
   },
 
-  async getByType(type: 'ongoing' | 'installment', is_active?: boolean): Promise<RecurringExpense[]> {
+  async getByType(type: 'ongoing' | 'installment', is_active?: boolean): Promise<Expense[]> {
     const all = await this.getAll(is_active);
     return all.filter(exp => exp.expense_type === type);
   },

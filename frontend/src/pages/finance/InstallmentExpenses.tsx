@@ -1,19 +1,19 @@
 import { createSignal, onMount, Show } from 'solid-js';
 import Layout from '../../components/Layout';
-import { recurringExpenseService } from '../../services/finance/recurringExpenseService';
-import type { RecurringExpense } from '../../services/finance/recurringExpenseService';
+import { expenseService } from '../../services/finance/expenseService';
+import type { Expense } from '../../services/finance/expenseService';
 import { categoryService } from '../../services/finance/categoryService';
 import type { Category } from '../../services/finance/categoryService';
-import RecurringExpenseForm from './components/RecurringExpenseForm';
+import ExpenseForm from './components/ExpenseForm';
 import { format } from 'date-fns';
 import { toastStore } from '../../shared/stores/toastStore';
 
 const InstallmentExpenses = () => {
-  const [expenses, setExpenses] = createSignal<RecurringExpense[]>([]);
+  const [expenses, setExpenses] = createSignal<Expense[]>([]);
   const [categories, setCategories] = createSignal<Category[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [showForm, setShowForm] = createSignal(false);
-  const [editingExpense, setEditingExpense] = createSignal<RecurringExpense | null>(null);
+  const [editingExpense, setEditingExpense] = createSignal<Expense | null>(null);
   const [filterActive, setFilterActive] = createSignal<boolean | undefined>(undefined);
 
   onMount(async () => {
@@ -32,7 +32,7 @@ const InstallmentExpenses = () => {
   const loadExpenses = async () => {
     try {
       setLoading(true);
-      const data = await recurringExpenseService.getByType('installment', filterActive());
+      const data = await expenseService.getByType('installment', filterActive());
       setExpenses(data);
     } catch (error) {
       console.error('Failed to load installment expenses:', error);
@@ -46,7 +46,7 @@ const InstallmentExpenses = () => {
     setShowForm(true);
   };
 
-  const handleEdit = (expense: RecurringExpense) => {
+  const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setShowForm(true);
   };
@@ -54,7 +54,7 @@ const InstallmentExpenses = () => {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this recurring expense?')) return;
     try {
-      await recurringExpenseService.delete(id);
+      await expenseService.delete(id);
       await loadExpenses();
     } catch (error) {
       console.error('Failed to delete recurring expense:', error);
@@ -64,7 +64,7 @@ const InstallmentExpenses = () => {
 
   const handleToggleActive = async (expense: RecurringExpense) => {
     try {
-      await recurringExpenseService.update(expense.id, { is_active: !expense.is_active });
+      await expenseService.update(expense.id, { is_active: !expense.is_active });
       await loadExpenses();
     } catch (error) {
       console.error('Failed to toggle recurring expense:', error);
@@ -72,12 +72,12 @@ const InstallmentExpenses = () => {
     }
   };
 
-  const handleGenerateTransaction = async (expense: RecurringExpense) => {
+  const handleGenerateTransaction = async (expense: Expense) => {
     const date = prompt('Enter transaction date (YYYY-MM-DD):', format(new Date(), 'yyyy-MM-dd'));
     if (!date) return;
     
     try {
-      await recurringExpenseService.generateTransaction(expense.id, { date });
+      await expenseService.generateTransaction(expense.id, { date });
       toastStore.success('Transaction generated successfully!');
       await loadExpenses();
     } catch (error: any) {
@@ -133,7 +133,7 @@ const InstallmentExpenses = () => {
         </div>
 
         <Show when={showForm()}>
-          <RecurringExpenseForm
+          <ExpenseForm
             expense={editingExpense()}
             categories={categories()}
             onClose={handleFormClose}

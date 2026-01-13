@@ -24,15 +24,15 @@ class TransactionService:
                 detail="Category not found"
             )
         
-        # Validate recurring_expense_id if provided
-        if transaction_data.recurring_expense_id:
-            from app.domain.finance.repositories.recurring_expense_repository import RecurringExpenseRepository
-            recurring_repo = RecurringExpenseRepository()
-            recurring = await recurring_repo.find_by_user_and_id(user_id, transaction_data.recurring_expense_id)
-            if not recurring:
+        # Validate expense_id if provided
+        if transaction_data.expense_id:
+            from app.domain.finance.repositories.expense_repository import ExpenseRepository
+            expense_repo = ExpenseRepository()
+            expense = await expense_repo.find_by_user_and_id(user_id, transaction_data.expense_id)
+            if not expense:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Recurring expense not found"
+                    detail="Expense not found"
                 )
         
         data = {
@@ -41,7 +41,7 @@ class TransactionService:
             "amount": transaction_data.amount,
             "description": transaction_data.description,
             "category_id": transaction_data.category_id,
-            "recurring_expense_id": transaction_data.recurring_expense_id,
+            "expense_id": transaction_data.expense_id,
             "tags": transaction_data.tags,
             "payment_method": transaction_data.payment_method,
             "notes": transaction_data.notes

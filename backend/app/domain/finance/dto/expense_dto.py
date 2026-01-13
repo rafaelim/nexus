@@ -4,7 +4,7 @@ from uuid import UUID
 from datetime import date, datetime
 
 
-class RecurringExpenseCreate(BaseModel):
+class ExpenseCreate(BaseModel):
     name: str
     amount: Optional[float] = None
     category_id: UUID
@@ -15,7 +15,7 @@ class RecurringExpenseCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class RecurringExpenseUpdate(BaseModel):
+class ExpenseUpdate(BaseModel):
     name: Optional[str] = None
     amount: Optional[float] = None
     category_id: Optional[UUID] = None
@@ -27,7 +27,7 @@ class RecurringExpenseUpdate(BaseModel):
     notes: Optional[str] = None
 
 
-class RecurringExpenseResponse(BaseModel):
+class ExpenseResponse(BaseModel):
     id: UUID
     user_id: UUID
     name: str

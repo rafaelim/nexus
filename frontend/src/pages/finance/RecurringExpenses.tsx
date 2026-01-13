@@ -1,19 +1,19 @@
 import { createSignal, onMount, Show } from 'solid-js';
 import Layout from '../../components/Layout';
-import { recurringExpenseService } from '../../services/finance/recurringExpenseService';
-import type { RecurringExpense, RecurringExpenseCreate } from '../../services/finance/recurringExpenseService';
+import { expenseService } from '../../services/finance/expenseService';
+import type { Expense, ExpenseCreate } from '../../services/finance/expenseService';
 import { categoryService } from '../../services/finance/categoryService';
 import type { Category } from '../../services/finance/categoryService';
-import RecurringExpenseForm from './components/RecurringExpenseForm';
+import ExpenseForm from './components/ExpenseForm';
 import { format } from 'date-fns';
 import { toastStore } from '../../shared/stores/toastStore';
 
 const RecurringExpenses = () => {
-  const [expenses, setExpenses] = createSignal<RecurringExpense[]>([]);
+  const [expenses, setExpenses] = createSignal<Expense[]>([]);
   const [categories, setCategories] = createSignal<Category[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [showForm, setShowForm] = createSignal(false);
-  const [editingExpense, setEditingExpense] = createSignal<RecurringExpense | null>(null);
+  const [editingExpense, setEditingExpense] = createSignal<Expense | null>(null);
   const [filterType, setFilterType] = createSignal<string>('');
 
   onMount(async () => {
@@ -33,7 +33,7 @@ const RecurringExpenses = () => {
     try {
       setLoading(true);
       const params = filterType() ? { is_active: filterType() === 'active' } : undefined;
-      const data = await recurringExpenseService.getAll(params ? params.is_active : undefined);
+      const data = await expenseService.getAll(params ? params.is_active : undefined);
       setExpenses(data);
     } catch (error) {
       console.error('Failed to load recurring expenses:', error);
@@ -47,7 +47,7 @@ const RecurringExpenses = () => {
     setShowForm(true);
   };
 
-  const handleEdit = (expense: RecurringExpense) => {
+  const handleEdit = (expense: Expense) => {
     setEditingExpense(expense);
     setShowForm(true);
   };
@@ -55,7 +55,7 @@ const RecurringExpenses = () => {
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this recurring expense?')) return;
     try {
-      await recurringExpenseService.delete(id);
+      await expenseService.delete(id);
       await loadExpenses();
     } catch (error) {
       console.error('Failed to delete recurring expense:', error);
@@ -63,9 +63,9 @@ const RecurringExpenses = () => {
     }
   };
 
-  const handleToggleActive = async (expense: RecurringExpense) => {
+  const handleToggleActive = async (expense: Expense) => {
     try {
-      await recurringExpenseService.update(expense.id, { is_active: !expense.is_active });
+      await expenseService.update(expense.id, { is_active: !expense.is_active });
       await loadExpenses();
     } catch (error) {
       console.error('Failed to toggle recurring expense:', error);
@@ -73,12 +73,12 @@ const RecurringExpenses = () => {
     }
   };
 
-  const handleGenerateTransaction = async (expense: RecurringExpense) => {
+  const handleGenerateTransaction = async (expense: Expense) => {
     const date = prompt('Enter transaction date (YYYY-MM-DD):', format(new Date(), 'yyyy-MM-dd'));
     if (!date) return;
     
     try {
-      await recurringExpenseService.generateTransaction(expense.id, { date });
+      await expenseService.generateTransaction(expense.id, { date });
       toastStore.success('Transaction generated successfully!');
       await loadExpenses();
     } catch (error: any) {
@@ -133,7 +133,7 @@ const RecurringExpenses = () => {
         </div>
 
         <Show when={showForm()}>
-          <RecurringExpenseForm
+          <ExpenseForm
             expense={editingExpense()}
             categories={categories()}
             onClose={handleFormClose}
@@ -163,7 +163,7 @@ const RecurringExpenses = () => {
                       {expense.name}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      ${expense.amount.toFixed(2)}
+                      {expense.amount ? `$${expense.amount.toFixed(2)}` : 'N/A'}
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {getCategoryName(expense.category_id)}

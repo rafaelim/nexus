@@ -4,8 +4,8 @@ import { transactionService } from '../../services/finance/transactionService';
 import type { Transaction } from '../../services/finance/transactionService';
 import { categoryService } from '../../services/finance/categoryService';
 import type { Category } from '../../services/finance/categoryService';
-import { recurringExpenseService } from '../../services/finance/recurringExpenseService';
-import type { RecurringExpense } from '../../services/finance/recurringExpenseService';
+import { expenseService } from '../../services/finance/expenseService';
+import type { Expense } from '../../services/finance/expenseService';
 import { monthlyNoteService } from '../../services/finance/monthlyNoteService';
 import type { MonthlyNote } from '../../services/finance/monthlyNoteService';
 import ExpenseByCategoryChart from './components/charts/ExpenseByCategoryChart';
@@ -15,14 +15,14 @@ import { format, startOfMonth, endOfMonth, subMonths } from 'date-fns';
 const Dashboard = () => {
   const [transactions, setTransactions] = createSignal<Transaction[]>([]);
   const [categories, setCategories] = createSignal<Category[]>([]);
-  const [recurringExpenses, setRecurringExpenses] = createSignal<RecurringExpense[]>([]);
+  const [expenses, setExpenses] = createSignal<Expense[]>([]);
   const [monthlyNote, setMonthlyNote] = createSignal<MonthlyNote | null>(null);
   const [loading, setLoading] = createSignal(true);
   const [monthFilter, setMonthFilter] = createSignal(format(new Date(), 'yyyy-MM'));
 
   onMount(async () => {
     try {
-      await Promise.all([loadTransactions(), loadCategories(), loadRecurringExpenses(), loadMonthlyNote()]);
+      await Promise.all([loadTransactions(), loadCategories(), loadExpenses(), loadMonthlyNote()]);
     } catch (error) {
       console.error('Error loading dashboard data:', error);
       setLoading(false); // Ensure loading is set to false even on error
@@ -38,12 +38,12 @@ const Dashboard = () => {
     }
   };
 
-  const loadRecurringExpenses = async () => {
+  const loadExpenses = async () => {
     try {
-      const data = await recurringExpenseService.getAll(true);
-      setRecurringExpenses(data);
+      const data = await expenseService.getAll(true);
+      setExpenses(data);
     } catch (error) {
-      console.error('Failed to load recurring expenses:', error);
+      console.error('Failed to load expenses:', error);
     }
   };
 
@@ -141,7 +141,7 @@ const Dashboard = () => {
   const upcomingExpenses = () => {
     const today = new Date();
     const dayOfMonth = today.getDate();
-    return recurringExpenses()
+    return expenses()
       .filter(exp => exp.is_active && exp.day_of_month >= dayOfMonth)
       .sort((a, b) => a.day_of_month - b.day_of_month)
       .slice(0, 5);

@@ -2,32 +2,32 @@ from typing import List, Optional
 from uuid import UUID
 from datetime import date
 from fastapi import HTTPException, status
-from app.domain.finance.repositories.recurring_expense_repository import RecurringExpenseRepository
+from app.domain.finance.repositories.expense_repository import ExpenseRepository
 from app.domain.finance.repositories.category_repository import CategoryRepository
 from app.domain.finance.repositories.transaction_repository import TransactionRepository
-from app.domain.finance.dto.recurring_expense_dto import (
-    RecurringExpenseCreate,
-    RecurringExpenseUpdate,
-    RecurringExpenseResponse,
+from app.domain.finance.dto.expense_dto import (
+    ExpenseCreate,
+    ExpenseUpdate,
+    ExpenseResponse,
     GenerateTransactionRequest
 )
 from app.domain.finance.dto.transaction_dto import TransactionResponse
 
 
-class RecurringExpenseService:
-    """Service for recurring expense operations"""
+class ExpenseService:
+    """Service for expense operations"""
     
     def __init__(self):
-        self.recurring_repository = RecurringExpenseRepository()
+        self.expense_repository = ExpenseRepository()
         self.category_repository = CategoryRepository()
         self.transaction_repository = TransactionRepository()
     
-    async def create_recurring_expense(
+    async def create_expense(
         self,
         user_id: UUID,
-        expense_data: RecurringExpenseCreate
-    ) -> RecurringExpenseResponse:
-        """Create a new recurring expense"""
+        expense_data: ExpenseCreate
+    ) -> ExpenseResponse:
+        """Create a new expense"""
         # Validate expense_type
         if expense_data.expense_type not in ['ongoing', 'installment']:
             raise HTTPException(
@@ -79,45 +79,45 @@ class RecurringExpenseService:
             "notes": expense_data.notes
         }
         
-        expense = await self.recurring_repository.create(data)
-        return RecurringExpenseResponse(**expense)
+        expense = await self.expense_repository.create(data)
+        return ExpenseResponse(**expense)
     
-    async def get_recurring_expenses(
+    async def get_expenses(
         self,
         user_id: UUID,
         is_active: Optional[bool] = None
-    ) -> List[RecurringExpenseResponse]:
-        """Get all recurring expenses for a user"""
-        expenses = await self.recurring_repository.find_by_user_id(user_id, is_active)
-        return [RecurringExpenseResponse(**exp) for exp in expenses]
+    ) -> List[ExpenseResponse]:
+        """Get all expenses for a user"""
+        expenses = await self.expense_repository.find_by_user_id(user_id, is_active)
+        return [ExpenseResponse(**exp) for exp in expenses]
     
-    async def get_recurring_expense(
+    async def get_expense(
         self,
         user_id: UUID,
         expense_id: UUID
-    ) -> RecurringExpenseResponse:
-        """Get a recurring expense by ID"""
-        expense = await self.recurring_repository.find_by_user_and_id(user_id, expense_id)
+    ) -> ExpenseResponse:
+        """Get an expense by ID"""
+        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id)
         if not expense:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Recurring expense not found"
+                detail="Expense not found"
             )
-        return RecurringExpenseResponse(**expense)
+        return ExpenseResponse(**expense)
     
-    async def update_recurring_expense(
+    async def update_expense(
         self,
         user_id: UUID,
         expense_id: UUID,
-        expense_data: RecurringExpenseUpdate
-    ) -> RecurringExpenseResponse:
-        """Update a recurring expense"""
+        expense_data: ExpenseUpdate
+    ) -> ExpenseResponse:
+        """Update an expense"""
         # Verify expense exists and belongs to user
-        expense = await self.recurring_repository.find_by_user_and_id(user_id, expense_id)
+        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id)
         if not expense:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Recurring expense not found"
+                detail="Expense not found"
             )
         
         # Validate expense_type if provided
@@ -165,22 +165,22 @@ class RecurringExpenseService:
             update_data["notes"] = expense_data.notes
         
         if not update_data:
-            return RecurringExpenseResponse(**expense)
+            return ExpenseResponse(**expense)
         
-        updated_expense = await self.recurring_repository.update(expense_id, update_data)
-        return RecurringExpenseResponse(**updated_expense)
+        updated_expense = await self.expense_repository.update(expense_id, update_data)
+        return ExpenseResponse(**updated_expense)
     
-    async def delete_recurring_expense(self, user_id: UUID, expense_id: UUID) -> bool:
-        """Delete a recurring expense"""
+    async def delete_expense(self, user_id: UUID, expense_id: UUID) -> bool:
+        """Delete an expense"""
         # Verify expense exists and belongs to user
-        expense = await self.recurring_repository.find_by_user_and_id(user_id, expense_id)
+        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id)
         if not expense:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Recurring expense not found"
+                detail="Expense not found"
             )
         
-        return await self.recurring_repository.delete(expense_id)
+        return await self.expense_repository.delete(expense_id)
     
     async def generate_transaction(
         self,
@@ -188,19 +188,19 @@ class RecurringExpenseService:
         expense_id: UUID,
         transaction_data: GenerateTransactionRequest
     ) -> TransactionResponse:
-        """Generate a transaction from a recurring expense"""
-        # Get recurring expense
-        expense = await self.recurring_repository.find_by_user_and_id(user_id, expense_id)
+        """Generate a transaction from an expense"""
+        # Get expense
+        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id)
         if not expense:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Recurring expense not found"
+                detail="Expense not found"
             )
         
         if not expense["is_active"]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot generate transaction from inactive recurring expense"
+                detail="Cannot generate transaction from inactive expense"
             )
         
         # Create transaction
@@ -210,7 +210,7 @@ class RecurringExpenseService:
             amount=float(expense["amount"]) if expense["amount"] else 0.0,
             description=expense["name"],
             category_id=expense["category_id"],
-            recurring_expense_id=expense_id,
+            expense_id=expense_id,
             notes=transaction_data.notes or expense.get("notes")
         )
         
@@ -220,7 +220,7 @@ class RecurringExpenseService:
             "amount": transaction_create.amount,
             "description": transaction_create.description,
             "category_id": transaction_create.category_id,
-            "recurring_expense_id": transaction_create.recurring_expense_id,
+            "expense_id": transaction_create.expense_id,
             "notes": transaction_create.notes
         })
         
@@ -233,7 +233,7 @@ class RecurringExpenseService:
             if expense["total_payments"] and new_payments_completed >= expense["total_payments"]:
                 update_data["is_active"] = False
             
-            await self.recurring_repository.update(expense_id, update_data)
+            await self.expense_repository.update(expense_id, update_data)
         
         return TransactionResponse(**transaction)
 

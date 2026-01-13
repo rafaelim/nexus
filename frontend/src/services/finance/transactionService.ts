@@ -7,7 +7,7 @@ export interface Transaction {
   amount: number;
   description?: string;
   category_id: string;
-  recurring_expense_id?: string;
+  expense_id?: string;
   tags?: string[];
   payment_method?: string;
   notes?: string;
@@ -20,7 +20,7 @@ export interface TransactionCreate {
   amount: number;
   description?: string;
   category_id: string;
-  recurring_expense_id?: string;
+  expense_id?: string;
   tags?: string[];
   payment_method?: string;
   notes?: string;

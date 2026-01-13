@@ -34,9 +34,9 @@ finance_categories = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-# Recurring expenses table
-recurring_expenses = Table(
-    "recurring_expenses",
+# Expenses table
+expenses = Table(
+    "expenses",
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id"), nullable=False),
@@ -78,7 +78,7 @@ finance_transactions = Table(
     Column("amount", DECIMAL(10, 2), nullable=False),
     Column("description", Text, nullable=True),
     Column("category_id", UUID(as_uuid=True), ForeignKey("finance_categories.id"), nullable=False),
-    Column("recurring_expense_id", UUID(as_uuid=True), ForeignKey("recurring_expenses.id"), nullable=True),
+    Column("expense_id", UUID(as_uuid=True), ForeignKey("expenses.id"), nullable=True),
     Column("tags", JSONB, nullable=True),
     Column("payment_method", String(100), nullable=True),
     Column("notes", Text, nullable=True),

@@ -21,10 +21,10 @@ CREATE TABLE IF NOT EXISTS finance_categories (
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Recurring expenses table
+-- Expenses table
 CREATE TYPE expense_type AS ENUM ('ongoing', 'installment');
 
-CREATE TABLE IF NOT EXISTS recurring_expenses (
+CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     name VARCHAR(255) NOT NULL,
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS finance_transactions (
     amount DECIMAL(10, 2) NOT NULL,
     description TEXT,
     category_id UUID NOT NULL REFERENCES finance_categories(id) ON DELETE RESTRICT,
-    recurring_expense_id UUID REFERENCES recurring_expenses(id) ON DELETE SET NULL,
+    expense_id UUID REFERENCES expenses(id) ON DELETE SET NULL,
     tags JSONB,
     payment_method VARCHAR(100),
     notes TEXT,
@@ -74,10 +74,10 @@ CREATE TABLE IF NOT EXISTS monthly_notes (
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_user_id ON finance_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_date ON finance_transactions(date);
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_category_id ON finance_transactions(category_id);
-CREATE INDEX IF NOT EXISTS idx_finance_transactions_recurring_expense_id ON finance_transactions(recurring_expense_id);
+CREATE INDEX IF NOT EXISTS idx_finance_transactions_expense_id ON finance_transactions(expense_id);
 CREATE INDEX IF NOT EXISTS idx_finance_categories_user_id ON finance_categories(user_id);
-CREATE INDEX IF NOT EXISTS idx_recurring_expenses_user_id ON recurring_expenses(user_id);
-CREATE INDEX IF NOT EXISTS idx_recurring_expenses_category_id ON recurring_expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_category_id ON expenses(category_id);
 CREATE INDEX IF NOT EXISTS idx_monthly_notes_user_id ON monthly_notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_monthly_notes_domain_year_month ON monthly_notes(domain, year, month);
 

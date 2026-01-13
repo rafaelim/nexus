@@ -9,7 +9,7 @@ class TransactionCreate(BaseModel):
     amount: float
     description: Optional[str] = None
     category_id: UUID
-    recurring_expense_id: Optional[UUID] = None
+    expense_id: Optional[UUID] = None
     tags: Optional[List[str]] = None
     payment_method: Optional[str] = None
     notes: Optional[str] = None
