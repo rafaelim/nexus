@@ -3,9 +3,11 @@ from uuid import UUID
 from datetime import date
 from fastapi import HTTPException, status
 from app.domain.finance.repositories.transaction_repository import TransactionRepository
-from app.domain.finance.repositories.category_repository import CategoryRepository
 from app.domain.finance.services.expense_service import ExpenseService
-from app.domain.finance.dto.transaction_dto import TransactionCreate, TransactionUpdate, TransactionResponse
+from app.domain.finance.dto.transaction_dto import TransactionCreate, TransactionResponse
+from app.domain.finance.validations.transaction_validations import (
+    validate_transaction_create
+)
 
 
 class TransactionService:
@@ -13,29 +15,17 @@ class TransactionService:
     
     def __init__(self):
         self.transaction_repository = TransactionRepository()
-        self.category_repository = CategoryRepository()
         self.expense_service = ExpenseService()
     
     async def create_transaction(self, user_id: UUID, transaction_data: TransactionCreate) -> TransactionResponse:
         """Create a new transaction"""
-        # Validate category exists and belongs to user
-        category = await self.category_repository.find_by_user_and_id(user_id, transaction_data.category_id)
-        if not category:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Category not found"
-            )
-        
-        # Validate expense_id if provided
-        if transaction_data.expense_id:
-            # Basic validation - expense_service will handle the actual update logic
-            try:
-                await self.expense_service.get_expense(user_id, transaction_data.expense_id)
-            except HTTPException:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Expense not found"
-                )
+        # Validate transaction data
+        await validate_transaction_create(
+            user_id,
+            transaction_data.category_id,
+            transaction_data.amount,
+            transaction_data.expense_id
+        )
         
         data = {
             "user_id": user_id,
@@ -82,48 +72,15 @@ class TransactionService:
             )
         return TransactionResponse(**transaction)
     
-    async def update_transaction(
-        self,
-        user_id: UUID,
-        transaction_id: UUID,
-        transaction_data: TransactionUpdate
-    ) -> TransactionResponse:
-        """Update a transaction"""
-        # Verify transaction exists and belongs to user
-        transaction = await self.transaction_repository.find_by_user_and_id(user_id, transaction_id)
-        if not transaction:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Transaction not found"
-            )
-        
-        # Validate category if provided
-        if transaction_data.category_id:
-            category = await self.category_repository.find_by_user_and_id(user_id, transaction_data.category_id)
-            if not category:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Category not found"
-                )
-        
-        # Prepare update data - only include fields that were explicitly set
-        update_data = transaction_data.model_dump(exclude_unset=True)
-        
-        if not update_data:
-            return TransactionResponse(**transaction)
-        
-        updated_transaction = await self.transaction_repository.update(transaction_id, update_data)
-        return TransactionResponse(**updated_transaction)
-    
     async def delete_transaction(self, user_id: UUID, transaction_id: UUID) -> bool:
-        """Delete a transaction"""
-        # Verify transaction exists and belongs to user
-        transaction = await self.transaction_repository.find_by_user_and_id(user_id, transaction_id)
+        """Soft delete a transaction"""
+        # Verify transaction exists and belongs to user (exclude already deleted)
+        transaction = await self.transaction_repository.find_by_user_and_id(user_id, transaction_id, include_deleted=False)
         if not transaction:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Transaction not found"
             )
         
-        return await self.transaction_repository.delete(transaction_id)
+        return await self.transaction_repository.soft_delete(transaction_id)
 

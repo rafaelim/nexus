@@ -15,16 +15,6 @@ class TransactionCreate(BaseModel):
     notes: Optional[str] = None
 
 
-class TransactionUpdate(BaseModel):
-    date: Optional[date] = None
-    amount: Optional[float] = None
-    description: Optional[str] = None
-    category_id: Optional[UUID] = None
-    tags: Optional[List[str]] = None
-    payment_method: Optional[str] = None
-    notes: Optional[str] = None
-
-
 class TransactionResponse(BaseModel):
     id: UUID
     user_id: UUID
@@ -32,10 +22,11 @@ class TransactionResponse(BaseModel):
     amount: float
     description: Optional[str]
     category_id: UUID
-    recurring_expense_id: Optional[UUID]
+    expense_id: Optional[UUID]
     tags: Optional[List[str]]
     payment_method: Optional[str]
     notes: Optional[str]
+    deleted_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
     

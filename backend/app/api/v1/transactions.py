@@ -2,7 +2,7 @@ from fastapi import APIRouter, Query
 from typing import List, Optional
 from uuid import UUID
 from datetime import date
-from app.domain.finance.dto.transaction_dto import TransactionCreate, TransactionUpdate, TransactionResponse
+from app.domain.finance.dto.transaction_dto import TransactionCreate, TransactionResponse
 from app.domain.finance.services.transaction_service import TransactionService
 from app.core.user_context import get_current_user_id
 
@@ -39,16 +39,9 @@ async def get_transaction(transaction_id: UUID):
     return await transaction_service.get_transaction(user_id, transaction_id)
 
 
-@router.put("/{transaction_id}", response_model=TransactionResponse)
-async def update_transaction(transaction_id: UUID, transaction_data: TransactionUpdate):
-    """Update a transaction"""
-    user_id = get_current_user_id()
-    return await transaction_service.update_transaction(user_id, transaction_id, transaction_data)
-
-
 @router.delete("/{transaction_id}", status_code=204)
 async def delete_transaction(transaction_id: UUID):
-    """Delete a transaction"""
+    """Soft delete a transaction"""
     user_id = get_current_user_id()
     await transaction_service.delete_transaction(user_id, transaction_id)
     return None
