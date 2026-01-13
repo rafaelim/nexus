@@ -1,0 +1,233 @@
+# Expenses - Business Rules
+
+## Overview
+Expenses are recurring expenses that occur on a regular basis, typically monthly. They can be either **ongoing** (indefinite) or **installment** (fixed number of payments).
+
+## Types
+
+### 1. Ongoing Expenses
+- **Definition**: Expenses that continue indefinitely (e.g., rent, utilities, subscriptions)
+- **Characteristics**:
+  - No end date
+  - No fixed number of payments
+  - Can be active indefinitely
+  - `total_payments` must be `NULL`
+  - `payments_completed` is always `0` (not tracked)
+
+### 2. Installment Expenses
+- **Definition**: Expenses with a fixed number of payments (e.g., loan payments, financed purchases)
+- **Characteristics**:
+  - Has a fixed `total_payments` count
+  - Tracks `payments_completed`
+  - Automatically deactivates when all payments are completed
+  - `total_payments` is required and must be > 0
+
+## Data Model
+
+### Required Fields
+- `name`: String (required)
+- `category_id`: UUID (required, must exist and belong to user)
+- `day_of_month`: Integer (required, 1-31)
+- `expense_type`: Enum (required, 'ongoing' or 'installment')
+- `start_date`: Date (required)
+
+### Optional Fields
+- `amount`: Decimal (nullable) - Can be `NULL` for variable expenses
+- `total_payments`: Integer (nullable) - Required for installments, must be `NULL` for ongoing
+- `notes`: String (nullable)
+- `is_active`: Boolean (default: `true`)
+
+### Computed Fields
+- `payments_completed`: Integer (default: 0) - Only meaningful for installments
+- `created_at`: Timestamp
+- `updated_at`: Timestamp
+
+## Validation Rules
+
+### Create/Update Validation
+
+1. **Expense Type**
+   - Must be either `'ongoing'` or `'installment'`
+   - Cannot be changed after creation (recommended, not enforced)
+
+2. **Day of Month**
+   - Must be between 1 and 31 (inclusive)
+   - Represents the day of each month when the expense occurs
+
+3. **Category**
+   - Must exist in the database
+   - Must belong to the current user
+   - Cannot be deleted if referenced by active expenses
+
+4. **Amount**
+   - Can be `NULL` (for variable expenses)
+   - If provided, must be a valid decimal number
+   - No minimum/maximum value constraints
+
+5. **Total Payments (Installments Only)**
+   - **Required** for `expense_type = 'installment'`
+   - Must be greater than 0
+   - Must be `NULL` for `expense_type = 'ongoing'`
+
+6. **Total Payments (Ongoing Only)**
+   - Must be `NULL` for `expense_type = 'ongoing'`
+   - Cannot be set for ongoing expenses
+
+7. **Start Date**
+   - Must be a valid date
+   - No future date restrictions (can be in the past or future)
+
+## Business Logic
+
+### Create Expense
+
+**Rules:**
+1. Validate all required fields
+2. Validate expense type-specific rules (total_payments)
+3. Verify category exists and belongs to user
+4. Set `payments_completed = 0`
+5. Set `is_active = true` by default
+6. Create expense record
+
+**Errors:**
+- `400`: Invalid expense_type, invalid day_of_month, invalid total_payments
+- `404`: Category not found
+
+### Update Expense
+
+**Rules:**
+1. Verify expense exists and belongs to user
+2. Validate any provided fields (same rules as create)
+3. Only update fields that are provided (partial updates allowed)
+4. Cannot change `payments_completed` directly (only via transaction generation)
+
+**Errors:**
+- `404`: Expense not found
+- `400`: Invalid field values
+
+### Delete Expense
+
+**Rules:**
+1. Verify expense exists and belongs to user
+2. Hard delete (permanently remove from database)
+3. Associated transactions remain (with `expense_id` set to NULL due to `ON DELETE SET NULL`)
+
+**Errors:**
+- `404`: Expense not found
+
+### Generate Transaction
+
+**Purpose**: Create a transaction record from an expense
+
+**Rules:**
+1. Expense must exist and belong to user
+2. Expense must be `is_active = true`
+3. Transaction date is provided by user (can be different from `day_of_month`)
+4. Transaction amount uses expense `amount` (or 0.0 if `amount` is NULL)
+5. Transaction description uses expense `name`
+6. Transaction category uses expense `category_id`
+7. Transaction `notes` uses provided notes or falls back to expense notes
+8. Transaction is linked via `expense_id`
+
+**Installment-Specific Behavior:**
+- After generating transaction:
+  - Increment `payments_completed` by 1
+  - If `payments_completed >= total_payments`:
+    - Automatically set `is_active = false`
+    - Expense is now completed
+
+**Ongoing-Specific Behavior:**
+- No automatic state changes
+- `payments_completed` remains 0 (not tracked)
+
+**Errors:**
+- `404`: Expense not found
+- `400`: Expense is not active
+
+### Get Expenses
+
+**Rules:**
+1. Filter by current user
+2. Optional filter by `is_active` status
+3. Return all expenses matching criteria
+4. No pagination (for now)
+
+### Get Expense by ID
+
+**Rules:**
+1. Verify expense exists
+2. Verify expense belongs to user
+3. Return expense details
+
+**Errors:**
+- `404`: Expense not found
+
+## State Management
+
+### Active/Inactive States
+
+- **Active** (`is_active = true`):
+  - Can generate transactions
+  - Appears in active expense lists
+  - Can be manually deactivated
+
+- **Inactive** (`is_active = false`):
+  - Cannot generate transactions
+  - Can be manually reactivated
+  - Installments become inactive automatically when completed
+
+### State Transitions
+
+1. **Manual Deactivation**: User sets `is_active = false`
+2. **Manual Activation**: User sets `is_active = true`
+3. **Auto-Deactivation**: Installment expense completes all payments
+
+## Edge Cases
+
+### Variable Amount Expenses
+- `amount` can be `NULL`
+- When generating transaction, use `amount` if available, otherwise 0.0
+- User can override amount when creating transaction manually
+
+### Day of Month > 28/29/30/31
+- Day 31 expenses won't occur in months with fewer days
+- This is expected behavior (no special handling needed)
+- User should choose a day that works for their use case (e.g., use day 28 for monthly expenses)
+
+### Past Start Dates
+- Start date can be in the past
+- No automatic transaction generation
+- User manually generates transactions as needed
+
+### Completed Installments
+- Once `payments_completed >= total_payments`, expense becomes inactive
+- Can be manually reactivated if needed (e.g., if payment was refunded)
+- `payments_completed` can be manually adjusted via update (if needed)
+
+## API Endpoints
+
+### POST `/api/v1/expenses`
+Create a new expense
+
+### GET `/api/v1/expenses`
+Get all expenses (optional `?is_active=true/false` filter)
+
+### GET `/api/v1/expenses/{expense_id}`
+Get a specific expense
+
+### PUT `/api/v1/expenses/{expense_id}`
+Update an expense (partial updates supported)
+
+### DELETE `/api/v1/expenses/{expense_id}`
+Delete an expense
+
+### POST `/api/v1/expenses/{expense_id}/generate-transaction`
+Generate a transaction from an expense
+
+## Future Considerations
+
+- Automatic transaction generation on `day_of_month`
+- Recurring patterns other than monthly (weekly, yearly)
+- Pause/resume functionality
+- Expense templates
+- Bulk operations
