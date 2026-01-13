@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+---
+
+# Frontend - Coding Conventions
+
+## Project Structure
+- `src/pages/{domain}/`: Domain-specific pages
+- `src/pages/{domain}/components/`: Domain-specific components
+- `src/components/`: Generic/shared components
+- `src/services/{domain}/`: API service clients
+- `src/shared/`: Shared utilities and stores
+
+## TypeScript/SolidJS Conventions
+- Use TypeScript strict mode
+- Use SolidJS signals for state management
+- Use `import type` for type-only imports when `verbatimModuleSyntax` is enabled
+- Components are functions, not classes (no `Component` import needed)
+- `JSX` types are global (no import needed)
+- Use toast notifications instead of `alert()` for user feedback
+- Use Tailwind CSS v4 (via Vite plugin, no config file needed)
+
+## Frontend Conventions
+- Use Solid Router for navigation
+- Use Axios for API calls (configured in `src/shared/services/api.ts`)
+- Toast notifications via `toastStore` (import from `src/shared/stores/toastStore`)
+- Forms should validate before submission
+- Loading states should be shown during async operations
+- Error handling: Show toast notifications, don't use `alert()`
+
+## Component Patterns
+- Domain-specific components live in `pages/{domain}/components/`
+- Generic/shared components live in `components/`
+- Use SolidJS signals for reactive state
+- Use `createEffect` for side effects
+- Use `createResource` for async data fetching
+
+## Service Layer Patterns
+- API service clients live in `services/{domain}/`
+- Use Axios instance from `src/shared/services/api.ts`
+- Handle errors with toast notifications
+- Return typed responses matching backend DTOs

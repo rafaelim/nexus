@@ -1,4 +1,8 @@
-# Nexus - Cursor Rules
+---
+alwaysApply: true
+---
+
+# Nexus - General Project Rules
 
 ## Project Overview
 Nexus is a multi-domain home management application built with:
@@ -10,6 +14,7 @@ Nexus is a multi-domain home management application built with:
 Domain-specific business rules are documented in `.cursor/rules/`:
 - `finance/expenses.mdc` - Expenses business rules
 - `finance/transactions.mdc` - Transactions business rules
+- `finance/notes.mdc` - Notes (monthly/yearly) business rules
 - Additional rule files should follow the pattern: `{domain}/{service}.mdc`
 
 When implementing or modifying features, always refer to and follow the relevant business rules file.
@@ -23,6 +28,7 @@ When implementing or modifying features, always refer to and follow the relevant
   - `dto/`: Data Transfer Objects (Pydantic models)
   - `repositories/`: Data access layer (SQLAlchemy Core)
   - `services/`: Business logic layer
+  - `validations/`: Validation functions
   - `controllers/`: Optional domain controllers
 - `db/`: Database schema and migrations
 - Pattern: DTO → Controller → Service → Repository
@@ -33,50 +39,6 @@ When implementing or modifying features, always refer to and follow the relevant
 - `src/components/`: Generic/shared components
 - `src/services/{domain}/`: API service clients
 - `src/shared/`: Shared utilities and stores
-
-## Coding Conventions
-
-### Backend (Python)
-- Use type hints for all function parameters and return types
-- Use async/await for all database operations
-- Use Pydantic models for DTOs (Create, Update, Response)
-- Use SQLAlchemy Core (query builder), not ORM
-- Use UUID for all primary keys
-- Use `HTTPException` from FastAPI for errors
-- Services contain business logic, repositories contain data access
-- All user-scoped queries must filter by `user_id` (use `get_current_user_id()` from `app.core.user_context`)
-
-### Frontend (TypeScript/SolidJS)
-- Use TypeScript strict mode
-- Use SolidJS signals for state management
-- Use `import type` for type-only imports when `verbatimModuleSyntax` is enabled
-- Components are functions, not classes (no `Component` import needed)
-- `JSX` types are global (no import needed)
-- Use toast notifications instead of `alert()` for user feedback
-- Use Tailwind CSS v4 (via Vite plugin, no config file needed)
-
-## Database Rules
-- All tables use UUID primary keys with `gen_random_uuid()`
-- All user-scoped tables have `user_id` foreign key with `ON DELETE CASCADE`
-- Use ENUM types for fixed value sets (e.g., `expense_type`, `category_type`)
-- Use `ON DELETE RESTRICT` for category references to prevent orphaned records
-- Use `ON DELETE SET NULL` for optional references (e.g., `expense_id` in transactions)
-- All tables have `created_at` and `updated_at` timestamps
-
-## API Conventions
-- Use RESTful endpoints
-- Use appropriate HTTP status codes (200, 201, 204, 400, 404, etc.)
-- All endpoints are user-scoped (use `get_current_user_id()`)
-- Response models use Pydantic DTOs
-- Error responses include descriptive `detail` messages
-
-## Frontend Conventions
-- Use Solid Router for navigation
-- Use Axios for API calls (configured in `src/shared/services/api.ts`)
-- Toast notifications via `toastStore` (import from `src/shared/stores/toastStore`)
-- Forms should validate before submission
-- Loading states should be shown during async operations
-- Error handling: Show toast notifications, don't use `alert()`
 
 ## Domain Organization
 - Each domain (e.g., `finance`) is self-contained with its own DTOs, repositories, services
@@ -99,4 +61,4 @@ When implementing or modifying features, always refer to and follow the relevant
 - Database runs in Docker, API and FE run manually
 - Use `python3` (not `python`) for virtual environments
 - Tailwind CSS v4 uses Vite plugin (no `tailwind.config.js` or `postcss.config.js`)
-
+- Backend Makefile available: `make init-db`, `make migrate`, `make start`, `make dev`

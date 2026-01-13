@@ -1,0 +1,57 @@
+---
+alwaysApply: true
+---
+
+# Backend - Coding Conventions
+
+## Project Structure
+- `app/core/`: Core functionality (database, config, security)
+- `app/api/v1/`: API route handlers (thin controllers)
+- `app/domain/{domain}/`: Domain-specific code
+  - `dto/`: Data Transfer Objects (Pydantic models)
+  - `repositories/`: Data access layer (SQLAlchemy Core)
+  - `services/`: Business logic layer
+  - `validations/`: Validation functions
+  - `controllers/`: Optional domain controllers
+- `db/`: Database schema and migrations
+- Pattern: DTO → Controller → Service → Repository
+
+## Python Coding Conventions
+- Use type hints for all function parameters and return types
+- Use async/await for all database operations
+- Use Pydantic models for DTOs (Create, Update, Response)
+- Use SQLAlchemy Core (query builder), not ORM
+- Use UUID for all primary keys
+- Use `HTTPException` from FastAPI for errors
+- Services contain business logic, repositories contain data access
+- All user-scoped queries must filter by `user_id` (use `get_current_user_id()` from `app.core.user_context`)
+
+## Validation
+- Extract validation logic into `validations/` folder
+- Create `{service}_validations.py` files for each service
+- Validation functions should raise `HTTPException` with appropriate status codes
+- Use composite validation functions to orchestrate multiple validations
+
+## API Conventions
+- Use RESTful endpoints
+- Use appropriate HTTP status codes (200, 201, 204, 400, 404, etc.)
+- All endpoints are user-scoped (use `get_current_user_id()`)
+- Response models use Pydantic DTOs
+- Error responses include descriptive `detail` messages
+
+## Service Layer Patterns
+- Use `model_dump(exclude_unset=True)` for partial updates in Pydantic v2
+- Keep services focused on business logic, not data access
+- Delegate data access to repositories
+- Use validation functions from `validations/` modules
+
+## Repository Layer Patterns
+- Use SQLAlchemy Core (query builder), not ORM
+- All queries must filter by `user_id` for user-scoped data
+- Exclude soft-deleted records by default (`deleted_at IS NULL`)
+- Provide `include_deleted` parameter when needed for reports
+
+## Development Workflow
+- Use Makefile commands: `make init-db`, `make migrate`, `make start`, `make dev`
+- Run migrations before starting the API in development
+- Virtual environment is automatically used by Makefile (no need to activate manually)

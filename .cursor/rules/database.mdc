@@ -1,0 +1,42 @@
+---
+alwaysApply: true
+---
+
+# Database - Rules and Conventions
+
+## Schema Conventions
+- All tables use UUID primary keys with `gen_random_uuid()`
+- All user-scoped tables have `user_id` foreign key with `ON DELETE CASCADE`
+- Use ENUM types for fixed value sets (e.g., `expense_type`, `category_type`)
+- Use `ON DELETE RESTRICT` for category references to prevent orphaned records
+- Use `ON DELETE SET NULL` for optional references (e.g., `expense_id` in transactions)
+- All tables have `created_at` and `updated_at` timestamps
+
+## Soft Delete Pattern
+- Tables that need soft delete have `deleted_at` timestamp column
+- Soft-deleted records are excluded from normal queries by default
+- Use `include_deleted` parameter in repositories when needed for reports
+- Soft-deleted records remain in database for historical reporting
+
+## Unique Constraints
+- Use partial unique indexes for conditional uniqueness
+- Example: Monthly notes unique on `(user_id, domain, year, month) WHERE month IS NOT NULL`
+- Example: Yearly notes unique on `(user_id, domain, year) WHERE month IS NULL`
+
+## Migrations
+- Use Alembic for database migrations
+- Migration files in `db/migrations/versions/`
+- Run migrations with `make migrate` or `alembic upgrade head`
+- Always create migrations for schema changes, never modify schema.sql directly in production
+
+## Database Setup
+- Database runs in Docker container
+- Use `docker-compose up -d` to start database
+- Initialize with `make init-db` (runs schema.sql and seed.sql)
+- Connection: `postgresql://postgres:postgres@localhost:5432/nexus`
+
+## Query Patterns
+- All user-scoped queries must filter by `user_id`
+- Use SQLAlchemy Core (query builder), not ORM
+- Exclude soft-deleted records by default in repository methods
+- Use indexes for frequently queried columns (user_id, dates, foreign keys)
