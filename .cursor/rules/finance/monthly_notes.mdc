@@ -1,0 +1,193 @@
+---
+alwaysApply: true
+---
+
+# Monthly/Yearly Notes - Business Rules
+
+## Overview
+Monthly and Yearly Notes allow users to store notes for a specific period (month or year) and domain. There is exactly one note per user, domain, and period combination:
+- **Monthly Notes**: One note per user, domain, year, and month (month is 1-12)
+- **Yearly Notes**: One note per user, domain, and year (month is NULL)
+
+Notes can be created or updated through the same endpoint. The same service handles both monthly and yearly notes.
+
+## Related Files
+
+### Backend
+- **API Endpoint**: `backend/app/api/v1/notes.py`
+- **Service**: `backend/app/domain/finance/services/note_service.py`
+- **Repository**: `backend/app/domain/finance/repositories/note_repository.py`
+- **DTO**: `backend/app/domain/finance/dto/note_dto.py`
+- **Database Schema**: `backend/db/schema.sql` (monthly_notes table)
+- **Database Model**: `backend/app/core/database.py` (monthly_notes table definition)
+
+### Frontend
+- **Service**: `frontend/src/services/finance/monthlyNoteService.ts`
+- **Pages**:
+  - `frontend/src/pages/finance/MonthlyNotes.tsx`
+  - `frontend/src/pages/finance/Dashboard.tsx` (displays monthly notes)
+
+## Data Model
+
+### Required Fields
+- `domain`: String (required, default: "finance")
+- `year`: Integer (required)
+- `month`: Integer (optional, must be between 1 and 12 if provided, NULL for yearly notes)
+- `notes`: String (required)
+
+### Optional Fields
+- `deleted_at`: Timestamp (nullable) - Set when note is soft deleted
+
+### Computed Fields
+- `id`: UUID (primary key)
+- `user_id`: UUID (foreign key to users)
+- `created_at`: Timestamp
+- `updated_at`: Timestamp
+
+### Constraints
+- **Monthly Notes**: Partial unique index on `(user_id, domain, year, month) WHERE month IS NOT NULL` - ensures one monthly note per user/domain/year/month
+- **Yearly Notes**: Partial unique index on `(user_id, domain, year) WHERE month IS NULL` - ensures one yearly note per user/domain/year
+- `month` must be between 1 and 12 if provided (validated in application layer)
+
+## Validation Rules
+
+### Create/Update Validation
+
+1. **Month**
+   - Optional field (NULL for yearly notes, 1-12 for monthly notes)
+   - If provided, must be between 1 and 12 (inclusive)
+   - Validated in service layer
+
+2. **Year**
+   - Must be a valid integer
+   - No specific range restrictions
+
+3. **Domain**
+   - Defaults to "finance" if not provided
+   - String field, no specific validation rules
+
+4. **Notes**
+   - Required field
+   - Text field, no length restrictions
+
+## Business Logic
+
+### Create or Update Note
+
+**Purpose**: Create a new monthly or yearly note or update an existing one for the same period
+
+**Rules:**
+1. Validate month if provided (must be between 1 and 12 for monthly notes)
+2. Check if note already exists for the same user, domain, year, and month (if monthly) or year only (if yearly), excluding deleted
+3. If note exists:
+   - Update the `notes` field
+   - Return updated note
+4. If note doesn't exist:
+   - Create new note with provided data (month can be NULL for yearly notes)
+   - Return created note
+
+**Note**: This is a special "upsert" operation that allows creating or updating through the same endpoint. This is useful because there's exactly one note per period, so users can simply save their notes without worrying about whether it already exists.
+
+**Monthly vs Yearly Notes:**
+- **Monthly Note**: Provide `month` (1-12) along with `year`
+- **Yearly Note**: Omit `month` (or set to `null`) - only provide `year`
+
+**Errors:**
+- `400`: Invalid month (not between 1 and 12, or provided when it shouldn't be)
+
+### Get Monthly Notes
+
+**Rules:**
+1. Filter by current user
+2. Filter by domain (defaults to "finance")
+3. Exclude deleted notes by default (`deleted_at IS NULL`)
+4. Return all notes matching criteria
+5. No pagination (for now)
+
+### Get Note by Period
+
+**Rules:**
+1. Filter by current user
+2. Filter by domain (defaults to "finance")
+3. Filter by year and optionally month:
+   - For monthly notes: provide both `year` and `month`
+   - For yearly notes: provide `year` only (month is `None`)
+4. Exclude deleted notes by default (`deleted_at IS NULL`)
+5. Return note if found, `None` if not found
+
+**Note**: Returns `None` (not an error) if note doesn't exist, allowing frontend to handle missing notes gracefully.
+
+### Delete Monthly Note
+
+**Rules:**
+1. Verify note exists and belongs to user
+2. Exclude already deleted notes (`deleted_at IS NULL`)
+3. Soft delete (set `deleted_at` timestamp, do not permanently remove from database)
+4. Deleted notes are excluded from normal queries but remain in database for historical reports
+5. After deletion, a new note can be created for the same period
+
+**Errors:**
+- `404`: Note not found (or note is already deleted)
+
+## State Management
+
+### Active/Deleted States
+
+- **Active** (`deleted_at IS NULL`):
+  - Appears in normal queries
+  - Can be updated via create_or_update endpoint
+  - Can be viewed and edited
+
+- **Deleted** (`deleted_at IS NOT NULL`):
+  - Excluded from normal queries
+  - Cannot be updated
+  - Remains in database for historical reports
+  - After deletion, a new note can be created for the same period
+
+## Edge Cases
+
+### Unique Constraints
+- **Monthly Notes**: Partial unique index ensures only one monthly note exists per `(user_id, domain, year, month)` where `month IS NOT NULL`
+- **Yearly Notes**: Partial unique index ensures only one yearly note exists per `(user_id, domain, year)` where `month IS NULL`
+- If a note is deleted, a new note can be created for the same period
+- The constraints prevent duplicate active notes for the same period
+- A user can have both a monthly note and a yearly note for the same year (they are different records)
+
+### Month Validation
+- Month must be between 1 and 12
+- No validation for year (can be past, present, or future)
+- No validation for leap years or month-specific day counts
+
+### Domain Support
+- Currently defaults to "finance"
+- Domain field allows for future expansion to other domains
+- All queries filter by domain
+
+## API Endpoints
+
+### POST `/api/v1/notes`
+Create or update a monthly or yearly note (upsert operation)
+- For monthly notes: include `month` (1-12) in request body
+- For yearly notes: omit `month` or set to `null` in request body
+
+### GET `/api/v1/notes`
+Get all monthly and yearly notes for current user (optional `domain` query parameter, defaults to "finance")
+
+### GET `/api/v1/notes/year/{year}`
+Get a specific yearly note by year (optional `domain` query parameter, defaults to "finance")
+- Returns `null` if note doesn't exist (not an error)
+
+### GET `/api/v1/notes/year/{year}/month/{month}`
+Get a specific monthly note by year and month (optional `domain` query parameter, defaults to "finance")
+- Returns `null` if note doesn't exist (not an error)
+
+### DELETE `/api/v1/notes/{note_id}`
+Soft delete a monthly or yearly note
+
+## Future Considerations
+
+- Rich text editing for notes
+- Note templates
+- Note attachments
+- Search functionality across notes
+- Export notes functionality

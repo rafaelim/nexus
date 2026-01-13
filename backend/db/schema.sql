@@ -59,18 +59,29 @@ CREATE TABLE IF NOT EXISTS finance_transactions (
     deleted_at TIMESTAMP WITH TIME ZONE
 );
 
--- Monthly notes table
-CREATE TABLE IF NOT EXISTS monthly_notes (
+-- Notes table (monthly and yearly)
+CREATE TABLE IF NOT EXISTS notes (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     domain VARCHAR(50) NOT NULL DEFAULT 'finance',
     year INTEGER NOT NULL,
-    month INTEGER NOT NULL CHECK (month >= 1 AND month <= 12),
+    month INTEGER CHECK (month IS NULL OR (month >= 1 AND month <= 12)),
     notes TEXT NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(user_id, domain, year, month)
+    deleted_at TIMESTAMP WITH TIME ZONE
 );
+
+-- Partial unique indexes for monthly and yearly notes
+-- Monthly notes: unique on (user_id, domain, year, month) where month IS NOT NULL
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notes_user_domain_year_month 
+    ON notes(user_id, domain, year, month) 
+    WHERE month IS NOT NULL;
+
+-- Yearly notes: unique on (user_id, domain, year) where month IS NULL
+CREATE UNIQUE INDEX IF NOT EXISTS uq_notes_user_domain_year_yearly 
+    ON notes(user_id, domain, year) 
+    WHERE month IS NULL;
 
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_user_id ON finance_transactions(user_id);
@@ -80,6 +91,6 @@ CREATE INDEX IF NOT EXISTS idx_finance_transactions_expense_id ON finance_transa
 CREATE INDEX IF NOT EXISTS idx_finance_categories_user_id ON finance_categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_category_id ON expenses(category_id);
-CREATE INDEX IF NOT EXISTS idx_monthly_notes_user_id ON monthly_notes(user_id);
-CREATE INDEX IF NOT EXISTS idx_monthly_notes_domain_year_month ON monthly_notes(domain, year, month);
+CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
+CREATE INDEX IF NOT EXISTS idx_notes_domain_year_month ON notes(domain, year, month);
 

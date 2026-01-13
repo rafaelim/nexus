@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
-from app.api.v1 import transactions, categories, expenses, monthly_notes
+from app.api.v1 import transactions, categories, expenses, notes
 
 app = FastAPI(
     title="Nexus API",
@@ -22,7 +22,7 @@ app.add_middleware(
 app.include_router(transactions.router, prefix="/api/v1/transactions", tags=["transactions"])
 app.include_router(categories.router, prefix="/api/v1/categories", tags=["categories"])
 app.include_router(expenses.router, prefix="/api/v1/expenses", tags=["expenses"])
-app.include_router(monthly_notes.router, prefix="/api/v1/monthly-notes", tags=["monthly-notes"])
+app.include_router(notes.router, prefix="/api/v1/notes", tags=["notes"])
 
 
 @app.get("/")

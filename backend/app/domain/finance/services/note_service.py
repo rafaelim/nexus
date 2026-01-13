@@ -1,32 +1,28 @@
 from typing import List, Optional
 from uuid import UUID
 from fastapi import HTTPException, status
-from app.domain.finance.repositories.monthly_note_repository import MonthlyNoteRepository
-from app.domain.finance.dto.monthly_note_dto import (
-    MonthlyNoteCreate,
-    MonthlyNoteResponse
+from app.domain.finance.repositories.note_repository import NoteRepository
+from app.domain.finance.dto.note_dto import (
+    NoteCreate,
+    NoteResponse
 )
+from app.domain.finance.validations.note_validations import validate_note_create
 
 
-class MonthlyNoteService:
-    """Service for monthly note operations"""
+class NoteService:
+    """Service for monthly and yearly note operations"""
     
     def __init__(self):
-        self.note_repository = MonthlyNoteRepository()
+        self.note_repository = NoteRepository()
     
-    async def create_or_update_monthly_note(
+    async def create_or_update_note(
         self,
         user_id: UUID,
-        note_data: MonthlyNoteCreate
-    ) -> MonthlyNoteResponse:
+        note_data: NoteCreate
+    ) -> NoteResponse:
         """Create or update a monthly or yearly note (creates if doesn't exist, updates if exists)"""
-        # Validate month if provided (for monthly notes)
-        if note_data.month is not None:
-            if not (1 <= note_data.month <= 12):
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Month must be between 1 and 12"
-                )
+        # Validate note data
+        validate_note_create(note_data)
         
         # Check if note already exists (excluding deleted)
         existing_note = await self.note_repository.find_by_user_and_period(
@@ -37,7 +33,7 @@ class MonthlyNoteService:
             # Update existing note (only notes field can be updated)
             update_data = {"notes": note_data.notes}
             updated_note = await self.note_repository.update(existing_note["id"], update_data)
-            return MonthlyNoteResponse(**updated_note)
+            return NoteResponse(**updated_note)
         else:
             # Create new note
             data = {
@@ -48,38 +44,38 @@ class MonthlyNoteService:
                 "notes": note_data.notes
             }
             note = await self.note_repository.create(data)
-            return MonthlyNoteResponse(**note)
+            return NoteResponse(**note)
     
-    async def get_monthly_notes(
+    async def get_notes(
         self,
         user_id: UUID,
         domain: str = "finance"
-    ) -> List[MonthlyNoteResponse]:
-        """Get all monthly notes for a user"""
+    ) -> List[NoteResponse]:
+        """Get all monthly and yearly notes for a user"""
         notes = await self.note_repository.find_by_user_id(user_id, domain)
-        return [MonthlyNoteResponse(**note) for note in notes]
+        return [NoteResponse(**note) for note in notes]
     
-    async def get_monthly_note(
+    async def get_note(
         self,
         user_id: UUID,
         year: int,
         month: Optional[int],
         domain: str = "finance"
-    ) -> Optional[MonthlyNoteResponse]:
+    ) -> Optional[NoteResponse]:
         """Get a monthly or yearly note by year and month (month is None for yearly notes)"""
         note = await self.note_repository.find_by_user_and_period(user_id, year, month, domain)
         if not note:
             return None
-        return MonthlyNoteResponse(**note)
+        return NoteResponse(**note)
     
-    async def delete_monthly_note(self, user_id: UUID, note_id: UUID) -> bool:
-        """Soft delete a monthly note"""
+    async def delete_note(self, user_id: UUID, note_id: UUID) -> bool:
+        """Soft delete a note"""
         # Verify note exists and belongs to user (exclude already deleted)
         note = await self.note_repository.find_by_user_and_id(user_id, note_id, include_deleted=False)
         if not note:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Monthly note not found"
+                detail="Note not found"
             )
         
         return await self.note_repository.soft_delete(note_id)

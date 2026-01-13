@@ -55,18 +55,19 @@ expenses = Table(
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
 
-# Monthly notes table
-monthly_notes = Table(
-    "monthly_notes",
+# Notes table (monthly and yearly)
+notes = Table(
+    "notes",
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id"), nullable=False),
     Column("domain", String(50), nullable=False, server_default="finance"),
     Column("year", Integer, nullable=False),
-    Column("month", Integer, nullable=False),
+    Column("month", Integer, nullable=True),  # NULL for yearly notes, 1-12 for monthly notes
     Column("notes", Text, nullable=False),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
 )
 
 # Finance transactions table
