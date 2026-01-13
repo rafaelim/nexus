@@ -126,7 +126,12 @@ const SidePanel = () => {
             {/* Settings Domain */}
             <div class="mb-4">
               <div class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
-                <span class="flex-1 text-left">Settings</span>
+                <A
+                  href="/settings/general"
+                  class="flex-1 text-left"
+                >
+                  Settings
+                </A>
                 <button
                   onClick={(e) => {
                     e.preventDefault();
@@ -155,6 +160,16 @@ const SidePanel = () => {
               </div>
               <Show when={expandedDomains().has('settings')}>
                 <div class="ml-4 mt-1 space-y-1">
+                  <A
+                    href="/settings/general"
+                    class={`block px-3 py-2 text-sm rounded-md transition-colors ${
+                      isActive('/settings/general') || isActive('/settings/general/houses')
+                        ? 'bg-indigo-100 text-indigo-700 font-medium'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    General
+                  </A>
                   <A
                     href="/settings/finance"
                     class={`block px-3 py-2 text-sm rounded-md transition-colors ${
@@ -193,7 +208,7 @@ const SidePanel = () => {
                 </svg>
               </A>
               <A
-                href="/settings/finance"
+                href="/settings/general"
                 class="block p-3 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
                 title="Settings"
               >

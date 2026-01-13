@@ -3,6 +3,7 @@ import api from '../../shared/services/api';
 export interface Expense {
   id: string;
   user_id: string;
+  property_id: string;
   name: string;
   amount?: number;
   category_id: string;
@@ -21,6 +22,7 @@ export interface ExpenseCreate {
   name: string;
   amount?: number;
   category_id: string;
+  property_id: string;
   day_of_month: number;
   expense_type: 'ongoing' | 'installment';
   start_date: string;
@@ -32,6 +34,7 @@ export interface ExpenseUpdate {
   name?: string;
   amount?: number;
   category_id?: string;
+  house_id?: string;
   day_of_month?: number;
   expense_type?: 'ongoing' | 'installment';
   start_date?: string;

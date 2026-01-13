@@ -1,4 +1,4 @@
-import { createSignal, onMount, Show } from 'solid-js';
+import { createSignal, createEffect } from 'solid-js';
 import { categoryService } from '../../../services/finance/categoryService';
 import type { Category, CategoryCreate, CategoryUpdate } from '../../../services/finance/categoryService';
 
@@ -8,25 +8,50 @@ interface CategoryFormProps {
   onSubmit: () => void;
 }
 
-const generateRandomColor = (): string => {
-  // Generate a random hex color
-  const letters = '0123456789ABCDEF';
-  let color = '#';
-  for (let i = 0; i < 6; i++) {
-    color += letters[Math.floor(Math.random() * 16)];
+const generateColorFromName = (name: string): string => {
+  // Generate a deterministic color from the category name
+  // This ensures the same name always gets the same color
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
   }
-  return color;
+  
+  // Generate RGB values from hash
+  const r = (hash & 0xFF0000) >> 16;
+  const g = (hash & 0x00FF00) >> 8;
+  const b = hash & 0x0000FF;
+  
+  // Ensure colors are not too dark or too light for better visibility
+  const adjustedR = Math.max(50, Math.min(200, Math.abs(r)));
+  const adjustedG = Math.max(50, Math.min(200, Math.abs(g)));
+  const adjustedB = Math.max(50, Math.min(200, Math.abs(b)));
+  
+  // Convert to hex
+  const toHex = (n: number) => {
+    const hex = n.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  
+  return `#${toHex(adjustedR)}${toHex(adjustedG)}${toHex(adjustedB)}`;
 };
 
 const CategoryForm = (props: CategoryFormProps) => {
   const [name, setName] = createSignal(props.category?.name || '');
   const [type, setType] = createSignal<'income' | 'expense'>(props.category?.type || 'expense');
-  // Initialize with random color for new categories, existing color for edits
-  const [color, setColor] = createSignal(
-    props.category?.color || generateRandomColor()
-  );
+  // Initialize color: use existing color if present, otherwise generate from name
+  const initialColor = props.category?.color || generateColorFromName(props.category?.name || '');
+  const [color, setColor] = createSignal(initialColor);
+  // Track if user has manually set the color (true if category has existing color, false otherwise)
+  const [colorManuallySet, setColorManuallySet] = createSignal(!!props.category?.color);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
+
+  // Update color when name changes (unless user has manually set it)
+  createEffect(() => {
+    if (name() && !colorManuallySet()) {
+      setColor(generateColorFromName(name()));
+    }
+  });
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
@@ -90,9 +115,15 @@ const CategoryForm = (props: CategoryFormProps) => {
             <input
               type="color"
               value={color() || '#000000'}
-              onInput={(e) => setColor(e.currentTarget.value)}
+              onInput={(e) => {
+                setColor(e.currentTarget.value);
+                setColorManuallySet(true);
+              }}
               class="w-full h-10 border border-gray-300 rounded-md"
             />
+            <p class="mt-1 text-xs text-gray-500">
+              Color is automatically generated from the name. You can override it manually.
+            </p>
           </div>
           {error() && <div class="text-red-600 text-sm mb-4">{error()}</div>}
           <div class="flex justify-end space-x-2">

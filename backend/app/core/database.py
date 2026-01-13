@@ -30,6 +30,20 @@ finance_categories = Table(
     Column("name", String(255), nullable=False),
     Column("type", SQLEnum("income", "expense", name="category_type"), nullable=False),
     Column("color", String(7), nullable=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
+    Column("created_at", DateTime(timezone=True), server_default=func.now()),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
+)
+
+# Properties table (system-wide, not user-scoped)
+properties = Table(
+    "properties",
+    metadata,
+    Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
+    Column("name", String(255), nullable=False, unique=True),
+    Column("is_active", Boolean, default=True, nullable=False),
+    Column("is_default", Boolean, default=False, nullable=False),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )
@@ -40,6 +54,7 @@ expenses = Table(
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id"), nullable=False),
+    Column("property_id", UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False),
     Column("name", String(255), nullable=False),
     Column("amount", DECIMAL(10, 2), nullable=True),
     Column("category_id", UUID(as_uuid=True), ForeignKey("finance_categories.id"), nullable=False),
@@ -76,6 +91,7 @@ finance_transactions = Table(
     metadata,
     Column("id", UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
     Column("user_id", UUID(as_uuid=True), ForeignKey("users.id"), nullable=False),
+    Column("property_id", UUID(as_uuid=True), ForeignKey("properties.id"), nullable=False),
     Column("date", Date, nullable=False),
     Column("amount", DECIMAL(10, 2), nullable=False),
     Column("description", Text, nullable=True),

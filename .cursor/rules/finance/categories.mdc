@@ -1,0 +1,247 @@
+---
+alwaysApply: true
+---
+
+# Categories - Business Rules
+
+## Overview
+Categories are used to classify expenses and transactions. They are user-scoped and can be either **income** or **expense** type. Categories are required for both expenses and transactions.
+
+## Related Files
+
+### Backend
+- **API Endpoint**: `backend/app/api/v1/categories.py`
+- **Service**: `backend/app/domain/finance/services/category_service.py`
+- **Repository**: `backend/app/domain/finance/repositories/category_repository.py`
+- **DTO**: `backend/app/domain/finance/dto/category_dto.py`
+- **Validations**: `backend/app/domain/finance/validations/category_validations.py`
+- **Database Schema**: `backend/db/schema.sql` (finance_categories table)
+- **Database Model**: `backend/app/core/database.py` (finance_categories table definition)
+
+### Frontend
+- **Service**: `frontend/src/services/finance/categoryService.ts`
+- **Pages**:
+  - `frontend/src/pages/settings/finance/Categories.tsx`
+- **Components**:
+  - `frontend/src/pages/finance/components/CategoryForm.tsx`
+
+## Types
+
+### 1. Income Categories
+- **Definition**: Categories for classifying income transactions
+- **Characteristics**:
+  - Used for transactions that represent money coming in
+  - Cannot be used for expenses (expenses must use expense-type categories)
+
+### 2. Expense Categories
+- **Definition**: Categories for classifying expense transactions and recurring expenses
+- **Characteristics**:
+  - Used for transactions that represent money going out
+  - Used for recurring expenses
+  - Can be used in both expenses and transactions
+
+## Data Model
+
+### Required Fields
+- `name`: String (required)
+- `type`: Enum (required, 'income' or 'expense')
+- `user_id`: UUID (required, foreign key to users)
+
+### Optional Fields
+- `color`: String (nullable) - Hex color code (e.g., "#FF5733") for UI display
+
+### Computed Fields
+- `id`: UUID (primary key)
+- `deleted_at`: Timestamp (nullable) - Set when category is soft deleted
+- `created_at`: Timestamp
+- `updated_at`: Timestamp
+
+## Validation Functions
+
+All validation logic is centralized in `backend/app/domain/finance/validations/category_validations.py`. The service layer uses these functions to validate category data before creating or updating records.
+
+### Core Validation Functions
+
+1. **`validate_category_type(category_type: str)`**
+   - Validates that category_type is either `'income'` or `'expense'`
+   - Raises `400` error if invalid
+
+2. **`validate_category_name(name: str)`**
+   - Validates that name is not empty
+   - Raises `400` error if invalid
+
+3. **`validate_category_color(color: Optional[str])`**
+   - Validates color format if provided (should be hex color code)
+   - Raises `400` error if format is invalid
+   - Allows `None` (optional field)
+
+4. **`validate_category_name_unique(user_id: UUID, name: str, exclude_id: Optional[UUID] = None)`**
+   - Async function that validates category name is unique for the user
+   - Allows excluding a specific category_id during updates
+   - Raises `400` error if a duplicate name exists for the user
+
+### Composite Validation Functions
+
+5. **`validate_category_create(category_data: CategoryCreate)`**
+   - Orchestrates all validations for category creation
+   - Calls: `validate_category_type`, `validate_category_name`, `validate_category_color`
+   - Used in `CategoryService.create_category()`
+
+6. **`validate_category_update(category_data: CategoryUpdate)`**
+   - Validates fields for category updates (only validates provided fields)
+   - Calls: `validate_category_type` (if provided), `validate_category_name` (if provided), `validate_category_color` (if provided)
+   - Used in `CategoryService.update_category()`
+
+### Usage Pattern
+
+```python
+# In CategoryService.create_category()
+validate_category_create(category_data)
+await validate_category_name_unique(user_id, category_data.name)
+
+# In CategoryService.update_category()
+validate_category_update(category_data)
+if category_data.name is not None:
+    await validate_category_name_unique(user_id, category_data.name, exclude_id=category_id)
+```
+
+## Validation Rules
+
+### Create/Update Validation
+
+1. **Category Type**
+   - Must be either `'income'` or `'expense'`
+   - Cannot be changed after creation (recommended, not enforced)
+
+2. **Category Name**
+   - Must not be empty
+   - Must be unique per user (cannot have duplicate category names for the same user)
+   - No length restrictions (beyond database VARCHAR(255) limit)
+
+3. **Color**
+   - Optional field
+   - If provided, should be a valid hex color code (e.g., "#FF5733")
+   - Used for UI display purposes
+
+## Business Logic
+
+### Create Category
+
+**Rules:**
+1. Validate all required fields (name, type)
+2. Validate optional fields (color format if provided)
+3. Verify name is unique for the user
+4. Set `user_id` from current user context
+5. Create category record
+
+**Errors:**
+- `400`: Invalid category_type, invalid name, invalid color format, duplicate name
+
+### Update Category
+
+**Rules:**
+1. Verify category exists and belongs to user
+2. Validate any provided fields (same rules as create)
+3. If name is updated, verify new name is unique for the user (excluding current category)
+4. Only update fields that are provided (partial updates allowed)
+5. Cannot change `user_id` (category ownership is fixed)
+
+**Errors:**
+- `404`: Category not found
+- `400`: Invalid field values, duplicate name
+
+### Delete Category
+
+**Rules:**
+1. Verify category exists and belongs to user
+2. Exclude already deleted categories (`deleted_at IS NULL`)
+3. Soft delete (set `deleted_at` timestamp, do not permanently remove from database)
+4. Deleted categories are excluded from normal queries but remain in database for historical reports
+5. After deletion, a new category can be created with the same name (since deleted categories don't count for uniqueness)
+
+**Errors:**
+- `404`: Category not found (or category is already deleted)
+
+**Note**: Soft-deleted categories are excluded from uniqueness checks, so a new category can be created with the same name after deletion. The category remains in the database for historical reporting purposes. The database still enforces `ON DELETE RESTRICT` on the foreign key relationships, but since we're only soft-deleting (not actually removing the record), this constraint doesn't prevent deletion.
+
+### Get Categories
+
+**Rules:**
+1. Filter by current user
+2. Exclude deleted categories by default (`deleted_at IS NULL`)
+3. Return all categories matching criteria
+4. No pagination (for now)
+5. For reports, deleted categories can be included by passing `include_deleted=true` (if implemented)
+
+### Get Category by ID
+
+**Rules:**
+1. Verify category exists
+2. Verify category belongs to user
+3. Exclude deleted categories by default (`deleted_at IS NULL`)
+4. Return category details
+
+**Errors:**
+- `404`: Category not found (or category is deleted)
+
+## State Management
+
+### Category Usage
+
+- **Referenced by Expenses**: Category is used in one or more expenses
+- **Referenced by Transactions**: Category is used in one or more transactions
+- **Unreferenced**: Category is not used in any expenses or transactions
+
+### Deletion Constraints
+
+- Categories cannot be deleted if they are referenced by any expense (due to `ON DELETE RESTRICT`)
+- Categories cannot be deleted if they are referenced by any transaction (due to `ON DELETE RESTRICT`)
+- To delete a category, all referencing expenses and transactions must be deleted or updated first
+
+## Edge Cases
+
+### Duplicate Category Names
+- Users can have multiple categories with the same name
+- No uniqueness constraint on name per user
+- Users should be encouraged to use descriptive names to avoid confusion
+
+### Color Format
+- Color is optional
+- If provided, should follow hex color format (#RRGGBB)
+- Frontend may generate random colors for new categories if not provided
+
+### Type Consistency
+- Income categories should only be used for income transactions
+- Expense categories should only be used for expense transactions and expenses
+- Application should validate type consistency when creating expenses/transactions (handled in expense/transaction validations)
+
+### Category Deletion with References
+- If a category is referenced, deletion will fail at the database level
+- Application should catch the database constraint error and provide a user-friendly message
+- User must first delete or update all referencing expenses and transactions
+
+## API Endpoints
+
+### POST `/api/v1/categories`
+Create a new category
+
+### GET `/api/v1/categories`
+Get all categories for current user
+
+### GET `/api/v1/categories/{category_id}`
+Get a specific category
+
+### PUT `/api/v1/categories/{category_id}`
+Update a category (partial updates supported)
+
+### DELETE `/api/v1/categories/{category_id}`
+Delete a category (hard delete, fails if referenced)
+
+## Future Considerations
+
+- Category icons/images
+- Category hierarchy (parent/child categories)
+- Category templates
+- Bulk category operations
+- Category usage statistics
+- Soft delete for categories (to preserve historical data)

@@ -3,6 +3,7 @@ import api from '../../shared/services/api';
 export interface Transaction {
   id: string;
   user_id: string;
+  property_id: string;
   date: string;
   amount: number;
   description?: string;
@@ -20,6 +21,7 @@ export interface TransactionCreate {
   amount: number;
   description?: string;
   category_id: string;
+  property_id: string;
   expense_id?: string;
   tags?: string[];
   payment_method?: string;

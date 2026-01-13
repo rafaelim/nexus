@@ -3,6 +3,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from app.domain.finance.repositories.category_repository import CategoryRepository
 from app.domain.finance.dto.category_dto import CategoryCreate, CategoryUpdate, CategoryResponse
+from app.domain.finance.validations.category_validations import (
+    validate_category_create,
+    validate_category_update,
+    validate_category_name_unique,
+)
 
 
 class CategoryService:
@@ -13,12 +18,11 @@ class CategoryService:
     
     async def create_category(self, user_id: UUID, category_data: CategoryCreate) -> CategoryResponse:
         """Create a new category"""
-        # Validate type
-        if category_data.type not in ['income', 'expense']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Type must be 'income' or 'expense'"
-            )
+        # Validate category data
+        validate_category_create(category_data)
+        
+        # Check for duplicate name
+        await validate_category_name_unique(user_id, category_data.name)
         
         data = {
             "user_id": user_id,
@@ -55,12 +59,12 @@ class CategoryService:
                 detail="Category not found"
             )
         
-        # Validate type if provided
-        if category_data.type and category_data.type not in ['income', 'expense']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Type must be 'income' or 'expense'"
-            )
+        # Validate update data (only validates provided fields)
+        validate_category_update(category_data)
+        
+        # Check for duplicate name if name is being updated
+        if category_data.name is not None:
+            await validate_category_name_unique(user_id, category_data.name, exclude_id=category_id)
         
         # Prepare update data - only include fields that were explicitly set
         update_data = category_data.model_dump(exclude_unset=True)
@@ -71,8 +75,8 @@ class CategoryService:
         updated_category = await self.category_repository.update(category_id, update_data)
         return CategoryResponse(**updated_category)
     
-    async def delete_category(self, user_id: UUID, category_id: UUID) -> bool:
-        """Delete a category"""
+    async def delete_category(self, user_id: UUID, category_id: UUID) -> None:
+        """Soft delete a category"""
         # Verify category exists and belongs to user
         category = await self.category_repository.find_by_user_and_id(user_id, category_id)
         if not category:
@@ -81,5 +85,10 @@ class CategoryService:
                 detail="Category not found"
             )
         
-        return await self.category_repository.delete(category_id)
+        deleted = await self.category_repository.soft_delete(category_id)
+        if not deleted:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Category not found"
+            )
 

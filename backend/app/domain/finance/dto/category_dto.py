@@ -22,6 +22,7 @@ class CategoryResponse(BaseModel):
     name: str
     type: str
     color: Optional[str]
+    deleted_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
     

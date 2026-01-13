@@ -13,10 +13,17 @@ const SettingsSidePanel = () => {
     return location.pathname.startsWith('/settings/finance');
   };
 
+  const isGeneralRoute = () => {
+    return location.pathname.startsWith('/settings/general');
+  };
+
   // Get the current section name based on route
   const getCurrentSection = () => {
     if (isFinanceRoute()) {
       return 'Finance';
+    }
+    if (isGeneralRoute()) {
+      return 'General';
     }
     return 'Settings';
   };
@@ -50,6 +57,20 @@ const SettingsSidePanel = () => {
                   }`}
                 >
                   Categories
+                </A>
+              </div>
+            </Show>
+            <Show when={isGeneralRoute()}>
+              <div class="space-y-1">
+                <A
+                  href="/settings/general/properties"
+                  class={`block px-3 py-2 text-sm rounded-md transition-colors ${
+                    isActive('/settings/general/properties')
+                      ? 'bg-indigo-100 text-indigo-700 font-medium'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Properties
                 </A>
               </div>
             </Show>

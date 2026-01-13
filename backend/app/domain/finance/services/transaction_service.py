@@ -6,7 +6,8 @@ from app.domain.finance.repositories.transaction_repository import TransactionRe
 from app.domain.finance.services.expense_service import ExpenseService
 from app.domain.finance.dto.transaction_dto import TransactionCreate, TransactionResponse
 from app.domain.finance.validations.transaction_validations import (
-    validate_transaction_create
+    validate_transaction_create,
+    validate_property_exists
 )
 
 
@@ -24,11 +25,13 @@ class TransactionService:
             user_id,
             transaction_data.category_id,
             transaction_data.amount,
+            transaction_data.property_id,
             transaction_data.expense_id
         )
         
         data = {
             "user_id": user_id,
+            "house_id": transaction_data.house_id,
             "date": transaction_data.date,
             "amount": transaction_data.amount,
             "description": transaction_data.description,

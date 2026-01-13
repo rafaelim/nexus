@@ -8,6 +8,7 @@ class ExpenseCreate(BaseModel):
     name: str
     amount: Optional[float] = None
     category_id: UUID
+    property_id: UUID
     day_of_month: int
     expense_type: str  # 'ongoing' or 'installment'
     start_date: date
@@ -19,6 +20,7 @@ class ExpenseUpdate(BaseModel):
     name: Optional[str] = None
     amount: Optional[float] = None
     category_id: Optional[UUID] = None
+    house_id: Optional[UUID] = None
     day_of_month: Optional[int] = None
     expense_type: Optional[str] = None
     start_date: Optional[date] = None
@@ -30,6 +32,7 @@ class ExpenseUpdate(BaseModel):
 class ExpenseResponse(BaseModel):
     id: UUID
     user_id: UUID
+    property_id: UUID
     name: str
     amount: Optional[float]
     category_id: UUID

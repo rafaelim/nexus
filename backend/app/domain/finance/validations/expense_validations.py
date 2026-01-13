@@ -3,6 +3,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from app.domain.finance.dto.expense_dto import ExpenseCreate, ExpenseUpdate
 from app.domain.finance.repositories.category_repository import CategoryRepository
+from app.domain.settings.repositories.property_repository import PropertyRepository
 
 
 def validate_expense_type(expense_type: str) -> None:
@@ -50,6 +51,17 @@ async def validate_category_exists(user_id: UUID, category_id: UUID) -> None:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Category not found"
+        )
+
+
+async def validate_property_exists(property_id: UUID) -> None:
+    """Validate that property exists (no user check needed, properties are system-wide)"""
+    property_repo = PropertyRepository()
+    property = await property_repo.find_by_id(property_id)
+    if not property:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
         )
 
 

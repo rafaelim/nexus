@@ -2,6 +2,7 @@ from typing import Optional
 from uuid import UUID
 from fastapi import HTTPException, status
 from app.domain.finance.repositories.category_repository import CategoryRepository
+from app.domain.settings.repositories.property_repository import PropertyRepository
 from app.domain.finance.services.expense_service import ExpenseService
 
 
@@ -25,6 +26,17 @@ async def validate_category_exists(user_id: UUID, category_id: UUID) -> None:
         )
 
 
+async def validate_property_exists(property_id: UUID) -> None:
+    """Validate that property exists (no user check needed, properties are system-wide)"""
+    property_repo = PropertyRepository()
+    property = await property_repo.find_by_id(property_id)
+    if not property:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Property not found"
+        )
+
+
 async def validate_expense_exists(user_id: UUID, expense_id: UUID) -> None:
     """Validate that expense exists and belongs to user"""
     expense_service = ExpenseService()
@@ -37,10 +49,11 @@ async def validate_expense_exists(user_id: UUID, expense_id: UUID) -> None:
         )
 
 
-async def validate_transaction_create(user_id: UUID, category_id: UUID, amount: float, expense_id: Optional[UUID] = None) -> None:
+async def validate_transaction_create(user_id: UUID, category_id: UUID, amount: float, property_id: UUID, expense_id: Optional[UUID] = None) -> None:
     """Validate all fields for transaction creation"""
     validate_amount(amount)
     await validate_category_exists(user_id, category_id)
+    await validate_property_exists(property_id)
     if expense_id:
         await validate_expense_exists(user_id, expense_id)
 

@@ -14,6 +14,7 @@ from app.domain.finance.validations.expense_validations import (
     validate_expense_create,
     validate_expense_update,
     validate_category_exists,
+    validate_property_exists,
     validate_total_payments_for_update
 )
 
@@ -35,9 +36,11 @@ class ExpenseService:
         # Validate expense data
         validate_expense_create(expense_data)
         await validate_category_exists(user_id, expense_data.category_id)
+        await validate_property_exists(expense_data.property_id)
         
         data = {
             "user_id": user_id,
+            "property_id": expense_data.property_id,
             "name": expense_data.name,
             "amount": expense_data.amount,
             "category_id": expense_data.category_id,
@@ -97,6 +100,10 @@ class ExpenseService:
         # Validate category if provided
         if expense_data.category_id:
             await validate_category_exists(user_id, expense_data.category_id)
+        
+        # Validate property if provided
+        if expense_data.property_id:
+            await validate_property_exists(expense_data.property_id)
         
         # Validate total_payments based on expense type (current or updated)
         validate_total_payments_for_update(expense_data, expense["expense_type"])

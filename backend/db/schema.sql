@@ -17,8 +17,10 @@ CREATE TABLE IF NOT EXISTS finance_categories (
     name VARCHAR(255) NOT NULL,
     type category_type NOT NULL,
     color VARCHAR(7),
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(user_id, name)
 );
 
 -- Expenses table
@@ -27,6 +29,7 @@ CREATE TYPE expense_type AS ENUM ('ongoing', 'installment');
 CREATE TABLE IF NOT EXISTS expenses (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
     name VARCHAR(255) NOT NULL,
     amount DECIMAL(10, 2),
     category_id UUID NOT NULL REFERENCES finance_categories(id) ON DELETE RESTRICT,
@@ -46,6 +49,7 @@ CREATE TABLE IF NOT EXISTS expenses (
 CREATE TABLE IF NOT EXISTS finance_transactions (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
     date DATE NOT NULL,
     amount DECIMAL(10, 2) NOT NULL,
     description TEXT,
@@ -57,6 +61,17 @@ CREATE TABLE IF NOT EXISTS finance_transactions (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     deleted_at TIMESTAMP WITH TIME ZONE
+);
+
+-- Properties table (system-wide, not user-scoped)
+CREATE TABLE IF NOT EXISTS properties (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL UNIQUE,
+    is_active BOOLEAN DEFAULT TRUE NOT NULL,
+    is_default BOOLEAN DEFAULT FALSE NOT NULL,
+    deleted_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Notes table (monthly and yearly)
@@ -83,14 +98,21 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_notes_user_domain_year_yearly
     ON notes(user_id, domain, year) 
     WHERE month IS NULL;
 
+-- Partial unique index for default property (only one can be default system-wide)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_properties_is_default 
+    ON properties(is_default) 
+    WHERE is_default = TRUE AND deleted_at IS NULL;
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_user_id ON finance_transactions(user_id);
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_date ON finance_transactions(date);
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_category_id ON finance_transactions(category_id);
 CREATE INDEX IF NOT EXISTS idx_finance_transactions_expense_id ON finance_transactions(expense_id);
+CREATE INDEX IF NOT EXISTS idx_finance_transactions_property_id ON finance_transactions(property_id);
 CREATE INDEX IF NOT EXISTS idx_finance_categories_user_id ON finance_categories(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_user_id ON expenses(user_id);
 CREATE INDEX IF NOT EXISTS idx_expenses_category_id ON expenses(category_id);
+CREATE INDEX IF NOT EXISTS idx_expenses_property_id ON expenses(property_id);
 CREATE INDEX IF NOT EXISTS idx_notes_user_id ON notes(user_id);
 CREATE INDEX IF NOT EXISTS idx_notes_domain_year_month ON notes(domain, year, month);
 

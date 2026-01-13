@@ -8,6 +8,8 @@ import MonthlyNotes from './pages/finance/MonthlyNotes';
 import Settings from './pages/settings/Settings';
 import FinanceSettings from './pages/settings/finance/FinanceSettings';
 import Categories from './pages/settings/finance/Categories';
+import GeneralSettings from './pages/settings/general/GeneralSettings';
+import Properties from './pages/settings/general/Properties';
 import Toast from './components/Toast';
 
 function App() {
@@ -22,6 +24,8 @@ function App() {
         <Route path="/settings" component={Settings} />
         <Route path="/settings/finance" component={FinanceSettings} />
         <Route path="/settings/finance/categories" component={Categories} />
+        <Route path="/settings/general" component={GeneralSettings} />
+        <Route path="/settings/general/properties" component={Properties} />
       </Router>
       <Toast />
     </>

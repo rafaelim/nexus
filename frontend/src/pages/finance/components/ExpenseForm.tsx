@@ -1,7 +1,9 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, Show, onMount } from 'solid-js';
 import { expenseService } from '../../../services/finance/expenseService';
 import type { Expense, ExpenseCreate, ExpenseUpdate } from '../../../services/finance/expenseService';
 import type { Category } from '../../../services/finance/categoryService';
+import { propertyService } from '../../../services/finance/propertyService';
+import type { Property } from '../../../services/finance/propertyService';
 import { format } from 'date-fns';
 
 interface ExpenseFormProps {
@@ -16,6 +18,8 @@ const ExpenseForm = (props: ExpenseFormProps) => {
   const [name, setName] = createSignal(props.expense?.name || '');
   const [amount, setAmount] = createSignal(props.expense?.amount?.toString() || '');
   const [categoryId, setCategoryId] = createSignal(props.expense?.category_id || '');
+  const [propertyId, setPropertyId] = createSignal(props.expense?.property_id || '');
+  const [properties, setProperties] = createSignal<Property[]>([]);
   const [dayOfMonth, setDayOfMonth] = createSignal(props.expense?.day_of_month.toString() || '1');
   const [expenseType, setExpenseType] = createSignal<'ongoing' | 'installment'>(
     props.expense?.expense_type || props.defaultExpenseType || 'ongoing'
@@ -30,6 +34,24 @@ const ExpenseForm = (props: ExpenseFormProps) => {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
 
+  // Load properties and auto-select default
+  onMount(async () => {
+    try {
+      const propertiesData = await propertyService.getAll();
+      setProperties(propertiesData);
+      
+      // Auto-select default property if creating new expense
+      if (!props.expense && !propertyId()) {
+        const defaultProperty = await propertyService.getDefault();
+        if (defaultProperty) {
+          setPropertyId(defaultProperty.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load properties:', error);
+    }
+  });
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError('');
@@ -41,6 +63,7 @@ const ExpenseForm = (props: ExpenseFormProps) => {
           name: name(),
           amount: amount() ? parseFloat(amount()) : undefined,
           category_id: categoryId(),
+          property_id: propertyId(),
           day_of_month: parseInt(dayOfMonth()),
           expense_type: expenseType(),
           start_date: startDate(),
@@ -53,6 +76,7 @@ const ExpenseForm = (props: ExpenseFormProps) => {
           name: name(),
           amount: amount() ? parseFloat(amount()) : undefined,
           category_id: categoryId(),
+          property_id: propertyId(),
           day_of_month: parseInt(dayOfMonth()),
           expense_type: expenseType(),
           start_date: startDate(),
@@ -111,19 +135,37 @@ const ExpenseForm = (props: ExpenseFormProps) => {
               />
             </div>
           </div>
-          <div class="mb-4">
-            <label class="block text-sm font-medium text-gray-700 mb-1">Category</label>
-            <select
-              required
-              value={categoryId()}
-              onChange={(e) => setCategoryId(e.currentTarget.value)}
-              class="w-full px-3 py-2 border border-gray-300 rounded-md"
-            >
-              <option value="">Select a category</option>
-              {props.categories.map((cat) => (
-                <option value={cat.id}>{cat.name}</option>
-              ))}
-            </select>
+          <div class="grid grid-cols-2 gap-4 mb-4">
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Property *</label>
+              <select
+                required
+                value={propertyId()}
+                onChange={(e) => setPropertyId(e.currentTarget.value)}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select a property</option>
+                {properties().map((property) => (
+                  <option value={property.id}>
+                    {property.name} {property.is_default ? '(Default)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Category *</label>
+              <select
+                required
+                value={categoryId()}
+                onChange={(e) => setCategoryId(e.currentTarget.value)}
+                class="w-full px-3 py-2 border border-gray-300 rounded-md"
+              >
+                <option value="">Select a category</option>
+                {props.categories.map((cat) => (
+                  <option value={cat.id}>{cat.name}</option>
+                ))}
+              </select>
+            </div>
           </div>
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Expense Type</label>

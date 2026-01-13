@@ -1,9 +1,11 @@
 import { createSignal, onMount, Show, createEffect } from 'solid-js';
 import { transactionService } from '../../../services/finance/transactionService';
-import type { Transaction, TransactionCreate, TransactionUpdate } from '../../../services/finance/transactionService';
+import type { Transaction, TransactionCreate } from '../../../services/finance/transactionService';
 import type { Category } from '../../../services/finance/categoryService';
 import type { Expense } from '../../../services/finance/expenseService';
 import { expenseService } from '../../../services/finance/expenseService';
+import { propertyService } from '../../../services/finance/propertyService';
+import type { Property } from '../../../services/finance/propertyService';
 import { format } from 'date-fns';
 
 interface TransactionFormProps {
@@ -21,6 +23,8 @@ const TransactionForm = (props: TransactionFormProps) => {
   const [amount, setAmount] = createSignal(props.transaction?.amount.toString() || '');
   const [description, setDescription] = createSignal(props.transaction?.description || '');
   const [categoryId, setCategoryId] = createSignal(props.transaction?.category_id || '');
+  const [propertyId, setPropertyId] = createSignal(props.transaction?.property_id || '');
+  const [properties, setProperties] = createSignal<Property[]>([]);
   const [expenseId, setExpenseId] = createSignal(props.transaction?.expense_id || '');
   const [paymentMethod, setPaymentMethod] = createSignal(props.transaction?.payment_method || '');
   const [notes, setNotes] = createSignal(props.transaction?.notes || '');
@@ -29,7 +33,7 @@ const TransactionForm = (props: TransactionFormProps) => {
   const [error, setError] = createSignal('');
   const [expenses, setExpenses] = createSignal<Expense[]>(props.expenses || []);
 
-  // Load expenses if not provided
+  // Load expenses and houses if not provided
   onMount(async () => {
     if (!props.expenses || props.expenses.length === 0) {
       try {
@@ -38,6 +42,22 @@ const TransactionForm = (props: TransactionFormProps) => {
       } catch (error) {
         console.error('Failed to load expenses:', error);
       }
+    }
+    
+    // Load properties and auto-select default
+    try {
+      const propertiesData = await propertyService.getAll();
+      setProperties(propertiesData);
+      
+      // Auto-select default property if creating new transaction
+      if (!props.transaction && !propertyId()) {
+        const defaultProperty = await propertyService.getDefault();
+        if (defaultProperty) {
+          setPropertyId(defaultProperty.id);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load properties:', error);
     }
   });
 
@@ -70,30 +90,19 @@ const TransactionForm = (props: TransactionFormProps) => {
     try {
       const tagsArray = tags().split(',').map(t => t.trim()).filter(t => t);
       
-      if (props.transaction) {
-        const updateData: TransactionUpdate = {
-          date: date(),
-          amount: parseFloat(amount()),
-          description: description() || undefined,
-          category_id: categoryId(),
-          payment_method: paymentMethod() || undefined,
-          notes: notes() || undefined,
-          tags: tagsArray.length > 0 ? tagsArray : undefined,
-        };
-        await transactionService.update(props.transaction.id, updateData);
-      } else {
-        const createData: TransactionCreate = {
-          date: date(),
-          amount: parseFloat(amount()),
-          description: description() || undefined,
-          category_id: categoryId(),
-          expense_id: expenseId() || undefined,
-          payment_method: paymentMethod() || undefined,
-          notes: notes() || undefined,
-          tags: tagsArray.length > 0 ? tagsArray : undefined,
-        };
-        await transactionService.create(createData);
-      }
+      // Transactions cannot be updated, only created
+      const createData: TransactionCreate = {
+        date: date(),
+        amount: parseFloat(amount()),
+        description: description() || undefined,
+        category_id: categoryId(),
+        property_id: propertyId(),
+        expense_id: expenseId() || undefined,
+        payment_method: paymentMethod() || undefined,
+        notes: notes() || undefined,
+        tags: tagsArray.length > 0 ? tagsArray : undefined,
+      };
+      await transactionService.create(createData);
       props.onSubmit();
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to save transaction');
@@ -106,7 +115,7 @@ const TransactionForm = (props: TransactionFormProps) => {
     <div class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
       <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white m-4">
         <h3 class="text-lg font-bold mb-4">
-          {props.transaction ? 'Edit Transaction' : 'Create Transaction'}
+          Create Transaction
         </h3>
         <form onSubmit={handleSubmit}>
           <div class="grid grid-cols-2 gap-4 mb-4">
@@ -131,6 +140,22 @@ const TransactionForm = (props: TransactionFormProps) => {
                 class="w-full px-3 py-2 border border-gray-300 rounded-md"
               />
             </div>
+          </div>
+          <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Property *</label>
+            <select
+              required
+              value={propertyId()}
+              onChange={(e) => setPropertyId(e.currentTarget.value)}
+              class="w-full px-3 py-2 border border-gray-300 rounded-md"
+            >
+              <option value="">Select a property</option>
+              {properties().map((property) => (
+                <option value={property.id}>
+                  {property.name} {property.is_default ? '(Default)' : ''}
+                </option>
+              ))}
+            </select>
           </div>
           <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Expense (optional)</label>
