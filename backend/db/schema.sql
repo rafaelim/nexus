@@ -37,6 +37,7 @@ CREATE TABLE IF NOT EXISTS expenses (
     payments_completed INTEGER DEFAULT 0 NOT NULL,
     is_active BOOLEAN DEFAULT TRUE NOT NULL,
     notes TEXT,
+    deleted_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );

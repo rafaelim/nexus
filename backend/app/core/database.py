@@ -50,6 +50,7 @@ expenses = Table(
     Column("payments_completed", Integer, default=0, nullable=False),
     Column("is_active", Boolean, default=True, nullable=False),
     Column("notes", Text, nullable=True),
+    Column("deleted_at", DateTime(timezone=True), nullable=True),
     Column("created_at", DateTime(timezone=True), server_default=func.now()),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), onupdate=func.now()),
 )

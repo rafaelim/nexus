@@ -40,14 +40,10 @@ class ExpenseResponse(BaseModel):
     payments_completed: int
     is_active: bool
     notes: Optional[str]
+    deleted_at: Optional[datetime]
     created_at: datetime
     updated_at: datetime
     
     class Config:
         from_attributes = True
-
-
-class GenerateTransactionRequest(BaseModel):
-    date: date
-    notes: Optional[str] = None
 

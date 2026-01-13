@@ -62,14 +62,8 @@ class CategoryService:
                 detail="Type must be 'income' or 'expense'"
             )
         
-        # Prepare update data
-        update_data = {}
-        if category_data.name is not None:
-            update_data["name"] = category_data.name
-        if category_data.type is not None:
-            update_data["type"] = category_data.type
-        if category_data.color is not None:
-            update_data["color"] = category_data.color
+        # Prepare update data - only include fields that were explicitly set
+        update_data = category_data.model_dump(exclude_unset=True)
         
         if not update_data:
             return CategoryResponse(**category)

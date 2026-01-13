@@ -9,6 +9,7 @@ Nexus is a multi-domain home management application built with:
 ## Business Rules
 Domain-specific business rules are documented in `.cursor/rules/`:
 - `finance/expenses.mdc` - Expenses business rules
+- `finance/transactions.mdc` - Transactions business rules
 - Additional rule files should follow the pattern: `{domain}/{service}.mdc`
 
 When implementing or modifying features, always refer to and follow the relevant business rules file.

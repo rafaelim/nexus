@@ -145,6 +145,7 @@ const Transactions = () => {
           <TransactionForm
             transaction={editingTransaction()}
             categories={categories()}
+            expenses={[]}
             onClose={handleFormClose}
             onSubmit={handleFormSubmit}
           />

@@ -40,11 +40,6 @@ export interface ExpenseUpdate {
   notes?: string;
 }
 
-export interface GenerateTransactionRequest {
-  date: string;
-  notes?: string;
-}
-
 export const expenseService = {
   async getAll(is_active?: boolean): Promise<Expense[]> {
     const response = await api.get<Expense[]>('/expenses', {
@@ -70,11 +65,6 @@ export const expenseService = {
 
   async delete(id: string): Promise<void> {
     await api.delete(`/expenses/${id}`);
-  },
-
-  async generateTransaction(id: string, data: GenerateTransactionRequest) {
-    const response = await api.post(`/expenses/${id}/generate-transaction`, data);
-    return response.data;
   },
 
   async getByType(type: 'ongoing' | 'installment', is_active?: boolean): Promise<Expense[]> {

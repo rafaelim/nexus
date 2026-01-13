@@ -4,6 +4,7 @@ from datetime import date
 from fastapi import HTTPException, status
 from app.domain.finance.repositories.transaction_repository import TransactionRepository
 from app.domain.finance.repositories.category_repository import CategoryRepository
+from app.domain.finance.services.expense_service import ExpenseService
 from app.domain.finance.dto.transaction_dto import TransactionCreate, TransactionUpdate, TransactionResponse
 
 
@@ -13,6 +14,7 @@ class TransactionService:
     def __init__(self):
         self.transaction_repository = TransactionRepository()
         self.category_repository = CategoryRepository()
+        self.expense_service = ExpenseService()
     
     async def create_transaction(self, user_id: UUID, transaction_data: TransactionCreate) -> TransactionResponse:
         """Create a new transaction"""
@@ -26,10 +28,10 @@ class TransactionService:
         
         # Validate expense_id if provided
         if transaction_data.expense_id:
-            from app.domain.finance.repositories.expense_repository import ExpenseRepository
-            expense_repo = ExpenseRepository()
-            expense = await expense_repo.find_by_user_and_id(user_id, transaction_data.expense_id)
-            if not expense:
+            # Basic validation - expense_service will handle the actual update logic
+            try:
+                await self.expense_service.get_expense(user_id, transaction_data.expense_id)
+            except HTTPException:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Expense not found"
@@ -48,6 +50,11 @@ class TransactionService:
         }
         
         transaction = await self.transaction_repository.create(data)
+        
+        # Update expense if linked
+        if transaction_data.expense_id:
+            await self.expense_service.record_payment(user_id, transaction_data.expense_id)
+        
         return TransactionResponse(**transaction)
     
     async def get_transactions(
@@ -99,22 +106,8 @@ class TransactionService:
                     detail="Category not found"
                 )
         
-        # Prepare update data
-        update_data = {}
-        if transaction_data.date is not None:
-            update_data["date"] = transaction_data.date
-        if transaction_data.amount is not None:
-            update_data["amount"] = transaction_data.amount
-        if transaction_data.description is not None:
-            update_data["description"] = transaction_data.description
-        if transaction_data.category_id is not None:
-            update_data["category_id"] = transaction_data.category_id
-        if transaction_data.tags is not None:
-            update_data["tags"] = transaction_data.tags
-        if transaction_data.payment_method is not None:
-            update_data["payment_method"] = transaction_data.payment_method
-        if transaction_data.notes is not None:
-            update_data["notes"] = transaction_data.notes
+        # Prepare update data - only include fields that were explicitly set
+        update_data = transaction_data.model_dump(exclude_unset=True)
         
         if not update_data:
             return TransactionResponse(**transaction)

@@ -8,10 +8,14 @@ from app.domain.finance.repositories.transaction_repository import TransactionRe
 from app.domain.finance.dto.expense_dto import (
     ExpenseCreate,
     ExpenseUpdate,
-    ExpenseResponse,
-    GenerateTransactionRequest
+    ExpenseResponse
 )
-from app.domain.finance.dto.transaction_dto import TransactionResponse
+from app.domain.finance.validations.expense_validations import (
+    validate_expense_create,
+    validate_expense_update,
+    validate_category_exists,
+    validate_total_payments_for_update
+)
 
 
 class ExpenseService:
@@ -28,42 +32,9 @@ class ExpenseService:
         expense_data: ExpenseCreate
     ) -> ExpenseResponse:
         """Create a new expense"""
-        # Validate expense_type
-        if expense_data.expense_type not in ['ongoing', 'installment']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Expense type must be 'ongoing' or 'installment'"
-            )
-        
-        # Validate day_of_month
-        if not (1 <= expense_data.day_of_month <= 31):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Day of month must be between 1 and 31"
-            )
-        
-        # Validate installment payments
-        if expense_data.expense_type == 'installment':
-            if expense_data.total_payments is None or expense_data.total_payments <= 0:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="total_payments is required for installment expenses and must be greater than 0"
-                )
-        else:
-            # Ongoing expenses should not have total_payments
-            if expense_data.total_payments is not None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="total_payments should not be set for ongoing expenses"
-                )
-        
-        # Validate category exists and belongs to user
-        category = await self.category_repository.find_by_user_and_id(user_id, expense_data.category_id)
-        if not category:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Category not found"
-            )
+        # Validate expense data
+        validate_expense_create(expense_data)
+        await validate_category_exists(user_id, expense_data.category_id)
         
         data = {
             "user_id": user_id,
@@ -120,49 +91,18 @@ class ExpenseService:
                 detail="Expense not found"
             )
         
-        # Validate expense_type if provided
-        if expense_data.expense_type and expense_data.expense_type not in ['ongoing', 'installment']:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Expense type must be 'ongoing' or 'installment'"
-            )
-        
-        # Validate day_of_month if provided
-        if expense_data.day_of_month is not None and not (1 <= expense_data.day_of_month <= 31):
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Day of month must be between 1 and 31"
-            )
+        # Validate expense data (only validates provided fields)
+        validate_expense_update(expense_data)
         
         # Validate category if provided
         if expense_data.category_id:
-            category = await self.category_repository.find_by_user_and_id(user_id, expense_data.category_id)
-            if not category:
-                raise HTTPException(
-                    status_code=status.HTTP_404_NOT_FOUND,
-                    detail="Category not found"
-                )
+            await validate_category_exists(user_id, expense_data.category_id)
         
-        # Prepare update data
-        update_data = {}
-        if expense_data.name is not None:
-            update_data["name"] = expense_data.name
-        if expense_data.amount is not None:
-            update_data["amount"] = expense_data.amount
-        if expense_data.category_id is not None:
-            update_data["category_id"] = expense_data.category_id
-        if expense_data.day_of_month is not None:
-            update_data["day_of_month"] = expense_data.day_of_month
-        if expense_data.expense_type is not None:
-            update_data["expense_type"] = expense_data.expense_type
-        if expense_data.start_date is not None:
-            update_data["start_date"] = expense_data.start_date
-        if expense_data.total_payments is not None:
-            update_data["total_payments"] = expense_data.total_payments
-        if expense_data.is_active is not None:
-            update_data["is_active"] = expense_data.is_active
-        if expense_data.notes is not None:
-            update_data["notes"] = expense_data.notes
+        # Validate total_payments based on expense type (current or updated)
+        validate_total_payments_for_update(expense_data, expense["expense_type"])
+        
+        # Prepare update data - only include fields that were explicitly set
+        update_data = expense_data.model_dump(exclude_unset=True)
         
         if not update_data:
             return ExpenseResponse(**expense)
@@ -171,58 +111,26 @@ class ExpenseService:
         return ExpenseResponse(**updated_expense)
     
     async def delete_expense(self, user_id: UUID, expense_id: UUID) -> bool:
-        """Delete an expense"""
-        # Verify expense exists and belongs to user
-        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id)
+        """Soft delete an expense"""
+        # Verify expense exists and belongs to user (exclude already deleted)
+        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id, include_deleted=False)
         if not expense:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Expense not found"
             )
         
-        return await self.expense_repository.delete(expense_id)
+        return await self.expense_repository.soft_delete(expense_id)
     
-    async def generate_transaction(
-        self,
-        user_id: UUID,
-        expense_id: UUID,
-        transaction_data: GenerateTransactionRequest
-    ) -> TransactionResponse:
-        """Generate a transaction from an expense"""
-        # Get expense
-        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id)
+    async def record_payment(self, user_id: UUID, expense_id: UUID) -> None:
+        """Record a payment for an expense (increment payments_completed for installments)"""
+        # Get expense and verify it belongs to user
+        expense = await self.expense_repository.find_by_user_and_id(user_id, expense_id, include_deleted=False)
         if not expense:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Expense not found"
             )
-        
-        if not expense["is_active"]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Cannot generate transaction from inactive expense"
-            )
-        
-        # Create transaction
-        from app.domain.finance.dto.transaction_dto import TransactionCreate
-        transaction_create = TransactionCreate(
-            date=transaction_data.date,
-            amount=float(expense["amount"]) if expense["amount"] else 0.0,
-            description=expense["name"],
-            category_id=expense["category_id"],
-            expense_id=expense_id,
-            notes=transaction_data.notes or expense.get("notes")
-        )
-        
-        transaction = await self.transaction_repository.create({
-            "user_id": user_id,
-            "date": transaction_create.date,
-            "amount": transaction_create.amount,
-            "description": transaction_create.description,
-            "category_id": transaction_create.category_id,
-            "expense_id": transaction_create.expense_id,
-            "notes": transaction_create.notes
-        })
         
         # Update payments_completed for installments
         if expense["expense_type"] == "installment":
@@ -234,6 +142,6 @@ class ExpenseService:
                 update_data["is_active"] = False
             
             await self.expense_repository.update(expense_id, update_data)
-        
-        return TransactionResponse(**transaction)
+        # For ongoing expenses, no update needed
+    
 

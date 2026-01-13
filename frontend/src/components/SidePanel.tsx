@@ -131,24 +131,14 @@ const SidePanel = () => {
                     Categories
                   </A>
                   <A
-                    href="/expenses/ongoing"
+                    href="/expenses/expenses"
                     class={`block px-3 py-2 text-sm rounded-md transition-colors ${
-                      isActive('/expenses/ongoing')
+                      isActive('/expenses/expenses')
                         ? 'bg-indigo-100 text-indigo-700 font-medium'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
                   >
-                    Ongoing
-                  </A>
-                  <A
-                    href="/expenses/installments"
-                    class={`block px-3 py-2 text-sm rounded-md transition-colors ${
-                      isActive('/expenses/installments')
-                        ? 'bg-indigo-100 text-indigo-700 font-medium'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Installments
+                    Expenses
                   </A>
                   <A
                     href="/expenses/monthly-notes"

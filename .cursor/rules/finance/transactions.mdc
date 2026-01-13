@@ -1,0 +1,132 @@
+# Transactions - Business Rules
+
+## Overview
+Transactions represent individual income and expense entries. They can be created manually or linked to expenses for recurring payment tracking.
+
+## Data Model
+
+### Required Fields
+- `date`: Date (required)
+- `amount`: Decimal (required, must be > 0)
+- `category_id`: UUID (required, must exist and belong to user)
+
+### Optional Fields
+- `description`: String (nullable)
+- `expense_id`: UUID (nullable) - Links transaction to an expense
+- `tags`: Array of strings (nullable)
+- `payment_method`: String (nullable)
+- `notes`: String (nullable)
+
+### Computed Fields
+- `created_at`: Timestamp
+- `updated_at`: Timestamp
+
+## Business Logic
+
+### Create Transaction
+
+**Rules:**
+1. Validate category exists and belongs to user
+2. Validate `expense_id` if provided (see "Expense Selection" below)
+3. Amount must be greater than 0
+4. Create transaction record
+5. If `expense_id` is provided, update expense (see "Expense Selection" below)
+
+**Errors:**
+- `404`: Category not found
+- `404`: Expense not found (if `expense_id` provided)
+
+### Update Transaction
+
+**Rules:**
+1. Verify transaction exists and belongs to user
+2. Validate category if provided
+3. Only update fields that are provided (partial updates allowed)
+4. Note: Updating `expense_id` after creation does not trigger expense updates
+
+**Errors:**
+- `404`: Transaction not found
+- `404`: Category not found (if category_id provided)
+
+### Delete Transaction
+
+**Rules:**
+1. Verify transaction exists and belongs to user
+2. Hard delete (permanently remove from database)
+3. Note: Deleting a transaction does not reverse expense updates (e.g., `payments_completed`)
+
+**Errors:**
+- `404`: Transaction not found
+
+### Get Transactions
+
+**Rules:**
+1. Filter by current user
+2. Optional filters:
+   - `start_date`: Filter transactions on or after this date
+   - `end_date`: Filter transactions on or before this date
+   - `category_id`: Filter by category
+   - `limit`: Maximum number of results
+   - `offset`: Number of results to skip (for pagination)
+3. Results are ordered by date (descending)
+
+### Get Transaction by ID
+
+**Rules:**
+1. Verify transaction exists
+2. Verify transaction belongs to user
+3. Return transaction details
+
+**Errors:**
+- `404`: Transaction not found
+
+## Expense Selection
+
+**Purpose**: Expenses can be selected when creating transactions to pre-fill data and track recurring payments
+
+**Rules:**
+1. When creating a transaction, user can optionally select an expense via `expense_id`
+2. If `expense_id` is provided:
+   - Expense must exist and belong to user
+   - Expense must be `is_active = true` (can be validated, but not strictly required)
+   - Transaction is linked via `expense_id`
+   - Transaction fields can be pre-filled from expense (amount, description, category, notes) but user can override all values
+3. After transaction creation with `expense_id`:
+   - **For Installment Expenses:**
+     - Increment `payments_completed` by 1
+     - If `payments_completed >= total_payments`:
+       - Automatically set `is_active = false`
+       - Expense is now completed
+   - **For Ongoing Expenses:**
+     - No automatic state changes
+     - `payments_completed` remains 0 (not tracked)
+
+**Note**: All transactions are created through the transaction creation flow. Expenses are used to:
+- Pre-fill transaction data (optional)
+- Track recurring payment progress (for installments)
+- Link transactions to their source expense for reporting
+
+## API Endpoints
+
+### POST `/api/v1/transactions`
+Create a new transaction
+
+### GET `/api/v1/transactions`
+Get all transactions (optional query parameters: `start_date`, `end_date`, `category_id`, `limit`, `offset`)
+
+### GET `/api/v1/transactions/{transaction_id}`
+Get a specific transaction
+
+### PUT `/api/v1/transactions/{transaction_id}`
+Update a transaction (partial updates supported)
+
+### DELETE `/api/v1/transactions/{transaction_id}`
+Delete a transaction
+
+## Future Considerations
+
+- Transaction templates
+- Bulk transaction import
+- Transaction attachments/receipts
+- Recurring transaction automation
+- Transaction splitting (multiple categories per transaction)

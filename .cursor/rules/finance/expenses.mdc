@@ -1,7 +1,30 @@
+---
+alwaysApply: true
+---
+
 # Expenses - Business Rules
 
 ## Overview
 Expenses are recurring expenses that occur on a regular basis, typically monthly. They can be either **ongoing** (indefinite) or **installment** (fixed number of payments).
+
+## Related Files
+
+### Backend
+- **API Endpoint**: `backend/app/api/v1/expenses.py`
+- **Service**: `backend/app/domain/finance/services/expense_service.py`
+- **Repository**: `backend/app/domain/finance/repositories/expense_repository.py`
+- **DTO**: `backend/app/domain/finance/dto/expense_dto.py`
+- **Validations**: `backend/app/domain/finance/validations/expense_validations.py`
+- **Database Schema**: `backend/db/schema.sql` (expenses table)
+- **Database Model**: `backend/app/core/database.py` (expenses table definition)
+
+### Frontend
+- **Service**: `frontend/src/services/finance/expenseService.ts`
+- **Pages**:
+  - `frontend/src/pages/finance/Expenses.tsx`
+  - `frontend/src/pages/finance/Dashboard.tsx` (displays expenses)
+- **Components**:
+  - `frontend/src/pages/finance/components/ExpenseForm.tsx`
 
 ## Types
 
@@ -41,6 +64,67 @@ Expenses are recurring expenses that occur on a regular basis, typically monthly
 - `payments_completed`: Integer (default: 0) - Only meaningful for installments
 - `created_at`: Timestamp
 - `updated_at`: Timestamp
+
+## Validation Functions
+
+All validation logic is centralized in `backend/app/domain/finance/validations/expense_validations.py`. The service layer uses these functions to validate expense data before creating or updating records.
+
+### Core Validation Functions
+
+1. **`validate_expense_type(expense_type: str)`**
+   - Validates that expense_type is either `'ongoing'` or `'installment'`
+   - Raises `400` error if invalid
+
+2. **`validate_day_of_month(day_of_month: int)`**
+   - Validates that day_of_month is between 1 and 31 (inclusive)
+   - Raises `400` error if invalid
+
+3. **`validate_total_payments_for_installment(total_payments: Optional[int], expense_type: str)`**
+   - Validates total_payments for installment expenses
+   - Requires total_payments to be provided and > 0 when expense_type is 'installment'
+   - Raises `400` error if validation fails
+
+4. **`validate_total_payments_for_ongoing(total_payments: Optional[int], expense_type: str)`**
+   - Validates that ongoing expenses don't have total_payments
+   - Ensures total_payments is `None` for 'ongoing' expenses
+   - Raises `400` error if total_payments is set for ongoing expenses
+
+5. **`validate_category_exists(user_id: UUID, category_id: UUID)`**
+   - Async function that validates category exists and belongs to user
+   - Raises `404` error if category not found
+
+### Composite Validation Functions
+
+6. **`validate_expense_create(expense_data: ExpenseCreate)`**
+   - Orchestrates all validations for expense creation
+   - Calls: `validate_expense_type`, `validate_day_of_month`, `validate_total_payments_for_installment`, `validate_total_payments_for_ongoing`
+   - Used in `ExpenseService.create_expense()`
+
+7. **`validate_expense_update(expense_data: ExpenseUpdate)`**
+   - Validates fields for expense updates (only validates provided fields)
+   - Calls: `validate_expense_type` (if provided), `validate_day_of_month` (if provided)
+   - Used in `ExpenseService.update_expense()`
+
+8. **`validate_total_payments_for_update(expense_data: ExpenseUpdate, current_expense_type: str)`**
+   - Validates total_payments for expense updates based on expense type
+   - Handles cases where expense_type or total_payments is being updated
+   - Determines new expense type (uses updated value if provided, otherwise current)
+   - Validates total_payments based on the determined expense type
+   - Used in `ExpenseService.update_expense()`
+
+### Usage Pattern
+
+```python
+# In ExpenseService.create_expense()
+validate_expense_create(expense_data)
+await validate_category_exists(user_id, expense_data.category_id)
+
+# In ExpenseService.update_expense()
+validate_expense_update(expense_data)
+if expense_data.category_id:
+    await validate_category_exists(user_id, expense_data.category_id)
+validate_total_payments_for_update(expense_data, expense["expense_type"])
+```
 
 ## Validation Rules
 
@@ -99,7 +183,7 @@ Expenses are recurring expenses that occur on a regular basis, typically monthly
 1. Verify expense exists and belongs to user
 2. Validate any provided fields (same rules as create)
 3. Only update fields that are provided (partial updates allowed)
-4. Cannot change `payments_completed` directly (only via transaction generation)
+4. Cannot change `payments_completed` directly (only via `record_payment` method)
 
 **Errors:**
 - `404`: Expense not found
@@ -109,70 +193,66 @@ Expenses are recurring expenses that occur on a regular basis, typically monthly
 
 **Rules:**
 1. Verify expense exists and belongs to user
-2. Hard delete (permanently remove from database)
-3. Associated transactions remain (with `expense_id` set to NULL due to `ON DELETE SET NULL`)
+2. Soft delete (set `deleted_at` timestamp, do not permanently remove from database)
+3. Deleted expenses are excluded from normal queries but remain in database for historical reports
+4. Associated transactions remain (with `expense_id` set to NULL due to `ON DELETE SET NULL`)
 
 **Errors:**
 - `404`: Expense not found
 
-### Generate Transaction
+### Record Payment
 
-**Purpose**: Create a transaction record from an expense
+**Purpose**: Record a payment for an expense when a transaction is created with this expense
 
 **Rules:**
-1. Expense must exist and belong to user
-2. Expense must be `is_active = true`
-3. Transaction date is provided by user (can be different from `day_of_month`)
-4. Transaction amount uses expense `amount` (or 0.0 if `amount` is NULL)
-5. Transaction description uses expense `name`
-6. Transaction category uses expense `category_id`
-7. Transaction `notes` uses provided notes or falls back to expense notes
-8. Transaction is linked via `expense_id`
-
-**Installment-Specific Behavior:**
-- After generating transaction:
-  - Increment `payments_completed` by 1
-  - If `payments_completed >= total_payments`:
-    - Automatically set `is_active = false`
-    - Expense is now completed
-
-**Ongoing-Specific Behavior:**
-- No automatic state changes
-- `payments_completed` remains 0 (not tracked)
+1. Verify expense exists and belongs to user
+2. Exclude deleted expenses (`deleted_at IS NULL`)
+3. **For Installment Expenses:**
+   - Increment `payments_completed` by 1
+   - If `payments_completed >= total_payments`:
+     - Automatically set `is_active = false`
+     - Expense is now completed
+4. **For Ongoing Expenses:**
+   - No update needed
+   - `payments_completed` remains 0 (not tracked)
 
 **Errors:**
 - `404`: Expense not found
-- `400`: Expense is not active
+
+**Note**: This method is called automatically by the transaction service when a transaction is created with an `expense_id`. If the expense is not found, transaction creation will fail.
 
 ### Get Expenses
 
 **Rules:**
 1. Filter by current user
 2. Optional filter by `is_active` status
-3. Return all expenses matching criteria
-4. No pagination (for now)
+3. Exclude deleted expenses by default (`deleted_at IS NULL`)
+4. For reports, deleted expenses can be included by passing `include_deleted=true` (if implemented)
+5. Return all expenses matching criteria
+6. No pagination (for now)
 
 ### Get Expense by ID
 
 **Rules:**
 1. Verify expense exists
 2. Verify expense belongs to user
-3. Return expense details
+3. Exclude deleted expenses by default (`deleted_at IS NULL`)
+4. Return expense details
 
 **Errors:**
-- `404`: Expense not found
+- `404`: Expense not found (or expense is deleted)
 
 ## State Management
 
 ### Active/Inactive States
 
 - **Active** (`is_active = true`):
-  - Can generate transactions
+  - Can be selected when creating transactions
   - Appears in active expense lists
   - Can be manually deactivated
 
 - **Inactive** (`is_active = false`):
-  - Cannot generate transactions
+  - Can still be selected when creating transactions (but unusual)
   - Can be manually reactivated
   - Installments become inactive automatically when completed
 
@@ -186,7 +266,7 @@ Expenses are recurring expenses that occur on a regular basis, typically monthly
 
 ### Variable Amount Expenses
 - `amount` can be `NULL`
-- When generating transaction, use `amount` if available, otherwise 0.0
+- When selected in transaction form, use `amount` if available, otherwise leave empty
 - User can override amount when creating transaction manually
 
 ### Day of Month > 28/29/30/31
@@ -219,10 +299,7 @@ Get a specific expense
 Update an expense (partial updates supported)
 
 ### DELETE `/api/v1/expenses/{expense_id}`
-Delete an expense
-
-### POST `/api/v1/expenses/{expense_id}/generate-transaction`
-Generate a transaction from an expense
+Delete an expense (soft delete)
 
 ## Future Considerations
 
