@@ -1,9 +1,9 @@
 import { createSignal, onMount, Show } from 'solid-js';
-import Layout from '../../components/Layout';
-import { categoryService } from '../../services/finance/categoryService';
-import type { Category } from '../../services/finance/categoryService';
-import CategoryForm from './components/CategoryForm';
-import { toastStore } from '../../shared/stores/toastStore';
+import Layout from '../../../components/Layout';
+import { categoryService } from '../../../services/finance/categoryService';
+import type { Category } from '../../../services/finance/categoryService';
+import CategoryForm from '../../../pages/finance/components/CategoryForm';
+import { toastStore } from '../../../shared/stores/toastStore';
 
 const Categories = () => {
   const [categories, setCategories] = createSignal<Category[]>([]);

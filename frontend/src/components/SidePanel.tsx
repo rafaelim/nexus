@@ -1,10 +1,17 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, Show, createEffect } from 'solid-js';
 import { A, useLocation } from '@solidjs/router';
 
 const SidePanel = () => {
   const [isCollapsed, setIsCollapsed] = createSignal(false);
   const [expandedDomains, setExpandedDomains] = createSignal<Set<string>>(new Set(['expenses']));
   const location = useLocation();
+
+  // Auto-expand Settings if on settings route
+  createEffect(() => {
+    if (location.pathname.startsWith('/settings') && !expandedDomains().has('settings')) {
+      setExpandedDomains(new Set([...expandedDomains(), 'settings']));
+    }
+  });
 
   const toggleCollapse = () => {
     setIsCollapsed(!isCollapsed());
@@ -29,37 +36,9 @@ const SidePanel = () => {
     <div
       class={`bg-white border-r border-gray-200 transition-all duration-300 ${
         isCollapsed() ? 'w-16' : 'w-64'
-      } min-h-screen fixed left-0 top-0 z-40`}
+      } h-[calc(100vh-4rem)] fixed left-0 top-16 z-40`}
     >
       <div class="flex flex-col h-full">
-        {/* Header */}
-        <div class="flex items-center justify-between p-4 border-b border-gray-200">
-          <Show when={!isCollapsed()}>
-            <A href="/" class="text-xl font-bold text-gray-900">
-              Nexus
-            </A>
-          </Show>
-          <button
-            onClick={toggleCollapse}
-            class="p-2 rounded-md hover:bg-gray-100 text-gray-600"
-            title={isCollapsed() ? 'Expand' : 'Collapse'}
-          >
-            <svg
-              class={`w-5 h-5 transition-transform ${isCollapsed() ? '' : 'rotate-180'}`}
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                stroke-width="2"
-                d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-              />
-            </svg>
-          </button>
-        </div>
-
         {/* Navigation */}
         <nav class="flex-1 overflow-y-auto p-4">
           <Show when={!isCollapsed()}>
@@ -121,16 +100,6 @@ const SidePanel = () => {
                     Transactions
                   </A>
                   <A
-                    href="/expenses/categories"
-                    class={`block px-3 py-2 text-sm rounded-md transition-colors ${
-                      isActive('/expenses/categories')
-                        ? 'bg-indigo-100 text-indigo-700 font-medium'
-                        : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                  >
-                    Categories
-                  </A>
-                  <A
                     href="/expenses/expenses"
                     class={`block px-3 py-2 text-sm rounded-md transition-colors ${
                       isActive('/expenses/expenses')
@@ -149,6 +118,52 @@ const SidePanel = () => {
                     }`}
                   >
                     Monthly Notes
+                  </A>
+                </div>
+              </Show>
+            </div>
+
+            {/* Settings Domain */}
+            <div class="mb-4">
+              <div class="w-full flex items-center justify-between px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100 rounded-md transition-colors">
+                <span class="flex-1 text-left">Settings</span>
+                <button
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    toggleDomain('settings');
+                  }}
+                  class="p-1 hover:bg-gray-200 rounded ml-2"
+                  title="Toggle menu"
+                >
+                  <svg
+                    class={`w-4 h-4 transition-transform ${
+                      expandedDomains().has('settings') ? 'rotate-90' : ''
+                    }`}
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      stroke-linecap="round"
+                      stroke-linejoin="round"
+                      stroke-width="2"
+                      d="M9 5l7 7-7 7"
+                    />
+                  </svg>
+                </button>
+              </div>
+              <Show when={expandedDomains().has('settings')}>
+                <div class="ml-4 mt-1 space-y-1">
+                  <A
+                    href="/settings/finance"
+                    class={`block px-3 py-2 text-sm rounded-md transition-colors ${
+                      isActive('/settings/finance') || isActive('/settings/finance/categories')
+                        ? 'bg-indigo-100 text-indigo-700 font-medium'
+                        : 'text-gray-600 hover:bg-gray-100'
+                    }`}
+                  >
+                    Finance
                   </A>
                 </div>
               </Show>
@@ -177,9 +192,57 @@ const SidePanel = () => {
                   />
                 </svg>
               </A>
+              <A
+                href="/settings/finance"
+                class="block p-3 text-gray-600 hover:bg-gray-100 rounded-md transition-colors"
+                title="Settings"
+              >
+                <svg
+                  class="w-5 h-5"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"
+                  />
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="2"
+                    d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+                  />
+                </svg>
+              </A>
             </div>
           </Show>
         </nav>
+
+        {/* Footer with collapse button */}
+        <div class="border-t border-gray-200 p-2">
+          <button
+            onClick={toggleCollapse}
+            class="w-full p-1.5 rounded-md hover:bg-gray-100 text-gray-500 flex items-center justify-center transition-colors"
+            title={isCollapsed() ? 'Expand' : 'Collapse'}
+          >
+            <svg
+              class={`w-4 h-4 transition-transform ${isCollapsed() ? '' : 'rotate-180'}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
     </div>
   );
