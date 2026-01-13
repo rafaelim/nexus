@@ -1,0 +1,291 @@
+---
+alwaysApply: true
+---
+
+# Properties - Business Rules
+
+## Overview
+Properties are system-wide entities that represent physical locations (e.g., houses, apartments, offices). They are used to organize expenses and transactions by location. Properties are not user-scoped - they are available to all users in the system. Exactly one property must be marked as default at all times.
+
+## Related Files
+
+### Backend
+- **API Endpoint**: `backend/app/api/v1/properties.py`
+- **Service**: `backend/app/domain/settings/services/property_service.py`
+- **Repository**: `backend/app/domain/settings/repositories/property_repository.py`
+- **DTO**: `backend/app/domain/settings/dto/property_dto.py`
+- **Validations**: `backend/app/domain/settings/validations/property_validations.py`
+- **Database Schema**: `backend/db/schema.sql` (properties table)
+- **Database Model**: `backend/app/core/database.py` (properties table definition)
+
+### Frontend
+- **Service**: `frontend/src/services/finance/propertyService.ts`
+- **Pages**:
+  - `frontend/src/pages/settings/general/Properties.tsx`
+- **Components**:
+  - `frontend/src/pages/settings/general/components/PropertyForm.tsx`
+
+## Data Model
+
+### Required Fields
+- `name`: String (required, unique system-wide)
+- `is_active`: Boolean (default: `true`)
+- `is_default`: Boolean (default: `false`)
+
+### Optional Fields
+- `deleted_at`: Timestamp (nullable) - Set when property is soft deleted
+
+### Computed Fields
+- `id`: UUID (primary key)
+- `created_at`: Timestamp
+- `updated_at`: Timestamp
+
+### Constraints
+- **Unique Name**: Property names must be unique system-wide (enforced by database unique constraint)
+- **Default Property**: Exactly one property must be `is_default = true` at all times (enforced by partial unique index)
+- **No User Scope**: Properties are system-wide, not user-scoped
+
+## Validation Functions
+
+All validation logic is centralized in `backend/app/domain/settings/validations/property_validations.py`. The service layer uses these functions to validate property data before creating or updating records.
+
+### Core Validation Functions
+
+1. **`validate_property_name(name: str)`**
+   - Validates that property name is not empty or whitespace-only
+   - Raises `400` error if invalid
+
+2. **`validate_property_exists(property_id: UUID)`**
+   - Async function that validates property exists (system-wide, no user check)
+   - Raises `404` error if property not found
+
+3. **`validate_property_name_unique(name: str, exclude_id: Optional[UUID] = None)`**
+   - Async function that validates property name is unique system-wide
+   - Allows excluding a specific property_id during updates
+   - Only checks active (non-deleted) properties for uniqueness
+   - Raises `400` error if a duplicate name exists
+
+### Composite Validation Functions
+
+4. **`validate_property_create(property_data: PropertyCreate)`**
+   - Orchestrates all validations for property creation
+   - Calls: `validate_property_name`
+   - Used in `PropertyService.create_property()`
+
+5. **`validate_property_update(property_data: PropertyUpdate)`**
+   - Validates fields for property updates (only validates provided fields)
+   - Calls: `validate_property_name` (if provided)
+   - Used in `PropertyService.update_property()`
+
+### Usage Pattern
+
+```python
+# In PropertyService.create_property()
+validate_property_create(property_data)
+await validate_property_name_unique(property_data.name)
+
+# In PropertyService.update_property()
+validate_property_update(property_data)
+if property_data.name is not None:
+    await validate_property_name_unique(property_data.name, exclude_id=property_id)
+```
+
+## Validation Rules
+
+### Create/Update Validation
+
+1. **Name**
+   - Required
+   - Must be unique system-wide (case-sensitive, exact match)
+   - Cannot be empty or whitespace-only
+   - Maximum length: 255 characters
+
+2. **Is Active**
+   - Optional (defaults to `true`)
+   - Boolean field indicating if property is active
+
+3. **Is Default**
+   - Optional (defaults to `false`)
+   - Boolean field indicating if property is the default property
+   - Exactly one property must be default at all times
+   - First property created is automatically set as default
+
+## Business Logic
+
+### Create Property
+
+**Rules:**
+1. Validate all required fields (name)
+2. Verify name is unique system-wide
+3. If this is the first property, automatically set `is_default = true`
+4. If setting as default, unset previous default property
+5. Create property record
+
+**Errors:**
+- `400`: Invalid name, duplicate name
+
+**Note**: The first property created is automatically set as the default property. If a property is created with `is_default = true`, the previous default property is automatically unset.
+
+### Get Properties
+
+**Rules:**
+1. System-wide query (not user-scoped)
+2. Exclude deleted properties by default (`deleted_at IS NULL`)
+3. Return all properties matching criteria
+4. No pagination (for now)
+5. For reports, deleted properties can be included by passing `include_deleted=true`
+
+**Errors:**
+- None (returns empty list if no properties found)
+
+### Get Property by ID
+
+**Rules:**
+1. Verify property exists (system-wide)
+2. Exclude deleted properties by default (`deleted_at IS NULL`)
+3. Return property details
+
+**Errors:**
+- `404`: Property not found (or property is deleted)
+
+### Update Property
+
+**Rules:**
+1. Verify property exists
+2. Validate any provided fields (same rules as create)
+3. If name is updated, verify new name is unique system-wide (excluding current property)
+4. If `is_default` is being set to `true`:
+   - Unset previous default property
+   - Set this property as default
+5. If `is_default` is being set to `false`:
+   - Ensure at least one other property exists
+   - Set another property as default
+   - Cannot unset default if this is the only property
+6. Only update fields that are provided (partial updates allowed)
+
+**Errors:**
+- `404`: Property not found
+- `400`: Invalid field values, duplicate name, cannot unset default (only property)
+
+### Delete Property
+
+**Rules:**
+1. Verify property exists
+2. Exclude already deleted properties (`deleted_at IS NULL`)
+3. If this is the default property:
+   - Ensure at least one other property exists
+   - Set another property as default
+   - Cannot delete if this is the only property
+4. Soft delete (set `deleted_at` timestamp, do not permanently remove from database)
+5. Deleted properties are excluded from normal queries but remain in database for historical reports
+6. After deletion, a new property can be created with the same name (since deleted properties don't count for uniqueness)
+
+**Errors:**
+- `404`: Property not found (or property is already deleted)
+- `400`: Cannot delete the only property
+
+**Note**: Soft-deleted properties are excluded from uniqueness checks, so a new property can be created with the same name after deletion. The property remains in the database for historical reporting purposes. The database still enforces `ON DELETE RESTRICT` on foreign key relationships (expenses and transactions reference properties), but since we're only soft-deleting (not actually removing the record), this constraint doesn't prevent deletion.
+
+### Get Default Property
+
+**Purpose**: Get the system-wide default property (helper method)
+
+**Rules:**
+1. Query for property where `is_default = true`
+2. Exclude deleted properties (`deleted_at IS NULL`)
+3. Return property if found, `None` if not found
+
+**Errors:**
+- None (returns `None` if no default property found, though this should never happen in normal operation)
+
+## State Management
+
+### Active/Inactive States
+
+- **Active** (`is_active = true`):
+  - Property is available for use
+  - Can be selected when creating expenses and transactions
+  - Appears in active property lists
+
+- **Inactive** (`is_active = false`):
+  - Property is temporarily disabled
+  - Can still be selected (but unusual)
+  - Can be manually reactivated
+
+### Default Property State
+
+- **Default** (`is_default = true`):
+  - Exactly one property must be default at all times
+  - Default property is auto-selected in forms (expenses, transactions)
+  - When a new property is set as default, previous default is automatically unset
+
+- **Non-Default** (`is_default = false`):
+  - All other properties are non-default
+  - Can be set as default at any time
+
+### Deleted State
+
+- **Active** (`deleted_at IS NULL`):
+  - Property appears in normal queries
+  - Can be updated and used
+  - Counts toward uniqueness checks
+
+- **Deleted** (`deleted_at IS NOT NULL`):
+  - Excluded from normal queries
+  - Cannot be updated
+  - Remains in database for historical reports
+  - Does not count toward uniqueness checks
+  - After deletion, a new property can be created with the same name
+
+## Edge Cases
+
+### First Property Creation
+- When the first property is created, it is automatically set as `is_default = true`
+- This ensures there's always a default property
+
+### Only One Property
+- Cannot delete the only property
+- Cannot unset default for the only property
+- At least one property must exist at all times
+
+### Setting Default Property
+- When setting a property as default, the previous default is automatically unset
+- This is handled automatically by the `set_default_property` repository method
+
+### Duplicate Names
+- Property names must be unique system-wide
+- Soft-deleted properties don't count for uniqueness
+- After deletion, a new property can be created with the same name
+
+### Property References
+- Expenses and transactions reference properties via `property_id`
+- Properties use `ON DELETE RESTRICT` in foreign key relationships
+- Since we only soft-delete, the constraint doesn't prevent deletion
+- Deleted properties remain in database, so references remain valid
+
+## API Endpoints
+
+### POST `/api/v1/properties`
+Create a new property
+
+### GET `/api/v1/properties`
+Get all properties (optional `?include_deleted=true/false` filter)
+
+### GET `/api/v1/properties/{property_id}`
+Get a specific property
+
+### PUT `/api/v1/properties/{property_id}`
+Update a property (partial updates supported)
+
+### DELETE `/api/v1/properties/{property_id}`
+Soft delete a property
+
+## Future Considerations
+
+- Property images/photos
+- Property address and location details
+- Property metadata (square footage, rooms, etc.)
+- Property templates
+- Bulk property operations
+- Property usage statistics
+- Property archiving (separate from soft delete)

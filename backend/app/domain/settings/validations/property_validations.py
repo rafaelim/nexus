@@ -46,10 +46,3 @@ def validate_property_update(property_data: PropertyUpdate) -> None:
     if property_data.name is not None:
         validate_property_name(property_data.name)
 
-
-async def validate_default_property_update(property_id: UUID, is_default: bool) -> None:
-    """Validate default property logic"""
-    if is_default:
-        # This is handled in the service layer, but we can validate here too
-        pass
-
